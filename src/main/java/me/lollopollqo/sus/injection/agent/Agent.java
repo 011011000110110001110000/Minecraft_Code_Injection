@@ -1,0 +1,123 @@
+package me.lollopollqo.sus.injection.agent;
+
+import me.lollopollqo.sus.injection.rmi.RemoteHandle;
+
+import java.lang.instrument.Instrumentation;
+import java.lang.reflect.Method;
+import java.rmi.NoSuchObjectException;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
+
+import static me.lollopollqo.sus.injection.util.ReflectionUtils.getField;
+import static me.lollopollqo.sus.injection.util.ReflectionUtils.getMethod;
+
+/**
+ * TODO: Add documentation
+ *
+ * @author Lollopollqo
+ */
+public class Agent {
+    private static final String AGENT_HELLO_MESSAGE = "Hello from a Java agent!";
+    public static final String REMOTE_HANDLE_NAME = "_remoteHandle_";
+    public static final int REMOTE_HANDLE_PORT = 8888;
+    private static final RemoteHandle handle = new Handle();
+    public static Registry registry;
+    private static RemoteHandle handleStub;
+
+    public static void agentmain(String args, Instrumentation in) {
+        Thread.currentThread().setName("Lollopollqo's Java Agent");
+        System.out.println(AGENT_HELLO_MESSAGE);
+
+        try {
+            sendMessageInGame();
+        } catch (Exception e) {
+            System.err.println("WARNING: could not send welcome message ingame!");
+            e.printStackTrace(System.err);
+        }
+
+        // Export the remote handle
+        try {
+            Agent.handleStub = (RemoteHandle) UnicastRemoteObject.exportObject(Agent.handle, REMOTE_HANDLE_PORT);
+        } catch (RemoteException re) {
+            System.err.println("Could not export remote agent handle!");
+            re.printStackTrace(System.err);
+            return;
+        }
+
+        // Get RMI registry reference
+        try {
+            Agent.registry = LocateRegistry.getRegistry();
+        } catch (Exception e) {
+            System.err.println("Could not get RMI registry!!");
+            e.printStackTrace(System.err);
+            return;
+        }
+
+        // Bind the remote handler's stub in the registry
+        try {
+            Agent.registry.rebind(REMOTE_HANDLE_NAME, Agent.handleStub);
+            System.out.println("Handle binding complete!");
+        } catch (Exception e) {
+            System.err.println("Could not bind handle!");
+            e.printStackTrace(System.err);
+            return;
+        }
+
+        Runtime.getRuntime().addShutdownHook(
+                new Thread(
+                        Agent::shutdown,
+                        "Lollopollqo's Java Agent shutdown thread"
+                )
+        );
+
+    }
+
+    private static void sendMessageInGame() throws Exception {
+        sendSystemMessage(AGENT_HELLO_MESSAGE);
+    }
+
+    public static void sendSystemMessage(String message) throws Exception {
+        Class<?> MinecraftClass = Class.forName("emh");
+        Class<?> ComponentClass = Class.forName("tj");
+
+        Method literal = getMethod(ComponentClass, "b", String.class);
+        Object component = literal.invoke(ComponentClass, message);
+
+        Object instance = getField(MinecraftClass, "F").get(MinecraftClass);
+
+        Object player = getField(MinecraftClass, "t").get(instance);
+
+        if (player != null) {
+            Method sendSystemMessage = getMethod(player.getClass(), "a", ComponentClass);
+            sendSystemMessage.invoke(player, component);
+        } else {
+            System.err.println("Could not find player! Make sure you have joined a world.");
+        }
+    }
+
+    public static void shutdown() {
+        try {
+            UnicastRemoteObject.unexportObject(Agent.handle, true);
+        } catch (NoSuchObjectException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void runRemoteTask(Runnable task) {
+        try {
+            task.run();
+        } catch (Exception e) {
+            System.err.println("An exception occurred while executing remote task: ");
+            e.printStackTrace(System.err);
+        }
+    }
+
+    private static class Handle implements RemoteHandle {
+        @Override
+        public void submitTask(RemoteTask task) throws RemoteException {
+            Agent.runRemoteTask(task);
+        }
+    }
+}

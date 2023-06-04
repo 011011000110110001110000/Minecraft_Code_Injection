@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+}
+
+group = 'me.lollopollqo'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://maven.fabricmc.net/'
+    }
+}
+
+jar {
+    manifest {
+        attributes(
+                'Manifest-Version' : '1.0',
+                'Created-By' : "Gradle ${gradle.gradleVersion}",
+                'Agent-Class' : 'me.lollopollqo.sus.injection.agent.Agent',
+                'Can-Redefine-Classes' : 'true',
+                'Can-Retransform-Classes' : 'true',
+                'Main-Class' : 'me.lollopollqo.sus.injection.Main',
+                'Permissions' : 'all-permissions'
+        )
+    }
+}
+
+dependencies {
+    implementation 'org.jetbrains:annotations:24.0.0'
+    implementation 'org.jetbrains:annotations:24.0.0'
+    testImplementation platform('org.junit:junit-bom:5.9.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+}
+
+test {
+    useJUnitPlatform()
+}
