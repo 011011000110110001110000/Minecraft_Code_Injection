@@ -1,6 +1,7 @@
 package me.lollopollqo.sus.injection.agent;
 
 import me.lollopollqo.sus.injection.rmi.RemoteHandle;
+import me.lollopollqo.sus.injection.util.ReflectionUtils;
 
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Method;
@@ -9,9 +10,6 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-
-import static me.lollopollqo.sus.injection.util.ReflectionUtils.getField;
-import static me.lollopollqo.sus.injection.util.ReflectionUtils.getMethod;
 
 /**
  * TODO: Add documentation
@@ -62,15 +60,7 @@ public class Agent {
         } catch (Exception e) {
             System.err.println("Could not bind handle!");
             e.printStackTrace(System.err);
-            return;
         }
-
-        Runtime.getRuntime().addShutdownHook(
-                new Thread(
-                        Agent::shutdown,
-                        "Lollopollqo's Java Agent shutdown thread"
-                )
-        );
 
     }
 
@@ -79,19 +69,19 @@ public class Agent {
     }
 
     public static void sendSystemMessage(String message) throws Exception {
-        Class<?> MinecraftClass = Class.forName("emh");
-        Class<?> ComponentClass = Class.forName("tj");
+        Class<?> MinecraftClass = ReflectionUtils.loadClass("emh");
+        Class<?> ComponentClass = ReflectionUtils.loadClass("tj");
 
-        Method literal = getMethod(ComponentClass, "b", String.class);
-        Object component = literal.invoke(ComponentClass, message);
+        Method literal = ReflectionUtils.getMethod(ComponentClass, "b", String.class);
+        Object textComponent = literal.invoke(ComponentClass, message);
 
-        Object instance = getField(MinecraftClass, "F").get(MinecraftClass);
+        Object instance = ReflectionUtils.forceGetField(MinecraftClass, "F").get(MinecraftClass);
 
-        Object player = getField(MinecraftClass, "t").get(instance);
+        Object player = ReflectionUtils.forceGetField(MinecraftClass, "t").get(instance);
 
         if (player != null) {
-            Method sendSystemMessage = getMethod(player.getClass(), "a", ComponentClass);
-            sendSystemMessage.invoke(player, component);
+            Method sendSystemMessage = ReflectionUtils.getMethod(player.getClass(), "a", ComponentClass);
+            sendSystemMessage.invoke(player, textComponent);
         } else {
             System.err.println("Could not find player! Make sure you have joined a world.");
         }
