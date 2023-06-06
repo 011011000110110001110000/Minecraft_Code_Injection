@@ -15,15 +15,22 @@ repositories {
 jar {
     manifest {
         attributes(
-                'Manifest-Version' : '1.0',
-                'Created-By' : "Gradle ${gradle.gradleVersion}",
-                'Agent-Class' : 'me.lollopollqo.sus.injection.agent.Agent',
-                'Can-Redefine-Classes' : 'true',
-                'Can-Retransform-Classes' : 'true',
-                'Main-Class' : 'me.lollopollqo.sus.injection.Main',
-                'Permissions' : 'all-permissions'
+                'Manifest-Version': '1.0',
+                'Created-By': "Gradle ${gradle.gradleVersion}",
+                'Agent-Class': 'me.lollopollqo.sus.injection.agent.Agent',
+                'Can-Redefine-Classes': 'true',
+                'Can-Retransform-Classes': 'true',
+                'Main-Class': 'me.lollopollqo.sus.injection.Main',
+                'Permissions': 'all-permissions'
         )
     }
+}
+
+compileJava {
+    options.compilerArgs += [
+            "--add-exports",
+            "java.base/jdk.internal.misc=ALL-UNNAMED"
+    ]
 }
 
 dependencies {
