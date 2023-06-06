@@ -11,7 +11,10 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * Helper class that contains some useful methods for easier / more powerful reflection usage.
+ * Helper class that contains some useful methods for easier / more powerful reflection usage. <br>
+ * <br>
+ * <b>Note: </b>Usage of this class demands that the application is launched with the <code>"--add-exports"</code> and
+ * <code>"java.base/jdk.internal.misc=ALL-UNNAMED"</code> arguments to expose the {@link jdk.internal.misc} package at runtime.
  *
  * @author Lollopollqo
  */
@@ -114,6 +117,15 @@ public class ReflectionUtils {
         }
     }
 
+    /**
+     * Gets the value of the field with the specified name and type in the specified class. <br>
+     * This method bypasses any limitations that {@link Class#getDeclaredField(String)} has (see {@link jdk.internal.reflect.Reflection#registerFieldsToFilter}).
+     *
+     * @param owner The class that declares the field
+     * @param name The name of the field
+     * @param type The type of the field
+     * @return the value of the field
+     */
     @SuppressWarnings("unchecked")
     public static <T> T getFieldValue(Object owner, String name, Class<T> type) {
         try {
@@ -123,11 +135,24 @@ public class ReflectionUtils {
         }
     }
 
-    public static void invokeNonStaticMethod(Object owner, String name, MethodType type, Object... arguments) {
+    public static void invokeNonStaticVoid(Object owner, String name, MethodType type, Object... arguments) {
         try {
             LOOKUP.bind(owner, name, type).invokeWithArguments(arguments);
         } catch (Throwable e) {
-            new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(owner.getClass()) + "." + name + type, e).printStackTrace();
+            throw new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(owner.getClass()) + "." + name + type, e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T invokeNonStatic(Object owner, String name, Class<T> returnType, Class<?>[] argumentTypes, Object... arguments) {
+        return (T) invokeNonStatic(owner, name, MethodType.methodType(returnType, argumentTypes));
+    }
+
+    public static Object invokeNonStatic(Object owner, String name, MethodType type, Object... arguments) {
+        try {
+            return LOOKUP.bind(owner, name, type).invokeWithArguments(arguments);
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(owner.getClass()) + "." + name + type, e);
         }
     }
 
@@ -227,9 +252,9 @@ public class ReflectionUtils {
     }
 
     /**
-     * Finds the offset of the <code>override</code> field in an {@link AccessibleObject} instance.
+     * Finds the offset of the {@link AccessibleObject#override} field in an {@link AccessibleObject} instance.
      *
-     * @return the offset of the <code>override</code> field of an {@link AccessibleObject} instance, <br>
+     * @return the offset of the {@link AccessibleObject#override} field of an {@link AccessibleObject} instance, <br>
      * or <code>-1</code> if the offset could not be determined
      */
     private static long findOverrideOffset() {
