@@ -29,7 +29,7 @@ jar {
 compileJava {
     options.compilerArgs += [
             "--add-exports",
-            "java.base/jdk.internal.misc=ALL-UNNAMED"
+            "java.base/jdk.internal.misc=SusInjection.main"
     ]
 }
 
