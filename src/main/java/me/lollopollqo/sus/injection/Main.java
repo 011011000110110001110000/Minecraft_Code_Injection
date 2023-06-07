@@ -28,6 +28,7 @@ public class Main {
     public static void main(String[] args) throws RemoteException {
         Thread.currentThread().setName("Main Injector Thread");
         String agentPath;
+
         try {
             agentPath = new File(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getAbsolutePath();
         } catch (Exception e) {
