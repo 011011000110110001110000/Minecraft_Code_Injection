@@ -52,11 +52,16 @@ public class ReflectionUtils {
         addExportsToAll0 = addExportsToAll0Handle();
         addExports0 = addExports0Handle();
 
-        // Export the jdk.internal.misc package from the java.base module to the module this class is in, so we can access its contents
+        // Export the jdk.internal.misc package from the java.base module to the module this class is in, so we can access its contents,
+        // then get the jdk.internal.misc.Unsafe instance.
+        //
+        // Note: At the moment this is not useful, but it's pretty convenient to have the capabilities for doing this,
+        // especially since sun.misc.Unsafe does not expose all the methods in jdk.internal.misc.Unsafe.
         {
             try {
                 final String packageName = "jdk.internal.misc";
                 final String className = "Unsafe";
+                // IDEA obviously can't know that we are going to be able to access the class
                 //noinspection Java9ReflectionClassVisibility
                 final Class<?> internalUnsafeClass = Class.forName(packageName + "." + className);
                 final Module from = internalUnsafeClass.getModule();
@@ -66,9 +71,9 @@ public class ReflectionUtils {
             } catch (ClassNotFoundException cnfe) {
                 throw new RuntimeException("Could not export jdk.internal.misc to module " + ReflectionUtils.class.getModule().getName() + "!", cnfe);
             }
+            // No need to do anything fancy to get access to this now that we've exported the package
+            INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
         }
-
-        INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
     }
 
     /**
@@ -327,15 +332,19 @@ public class ReflectionUtils {
      */
     private static sun.misc.Unsafe findUnsafe() {
         final int unsafeModifiers = Modifier.STATIC | Modifier.FINAL;
-
         final List<Throwable> exceptions = new ArrayList<>();
+
+        // We cannot rely on the field name, as it is different in various JDK implementations
         for (Field field : sun.misc.Unsafe.class.getDeclaredFields()) {
 
+            // Verify that the field is of the correct type and has the correct access modifiers
             if (field.getType() != sun.misc.Unsafe.class || (field.getModifiers() & unsafeModifiers) != unsafeModifiers) {
                 continue;
             }
 
             try {
+                // Thankfully don't need to do anything fancy to set the field to be accessible
+                // since the jdk.unsupported module exports and opens the sun.misc package to all modules
                 field.setAccessible(true);
                 if (field.get(null) instanceof sun.misc.Unsafe unsafe) {
                     return unsafe;
@@ -345,6 +354,7 @@ public class ReflectionUtils {
             }
         }
 
+        // If we couldn't find the field, throw an exception
         final RuntimeException exception = new RuntimeException("Could not find sun.misc.Unsafe instance!");
         exceptions.forEach(exception::addSuppressed);
         throw exception;
