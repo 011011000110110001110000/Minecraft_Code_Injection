@@ -1,2 +1,4 @@
 rootProject.name = 'SusInjection'
+include 'src:test'
+findProject(':src:test')?.name = 'test'
 
