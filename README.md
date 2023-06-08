@@ -1,1 +1,3 @@
 # Mincraft Code Injection
+
+#### Note: if you are not using Gradle to build the project, or you simply want your IDE to stop complaining about the `jdk.internal.misc` package not being accessible, you need to add the following compiler arguments for the `SusInjetion.main` module (like you see in the SusInjection module's build.gradle file): <br>`--add-exports java.base/jdk.internal.misc=SusInjection.main`
