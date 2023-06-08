@@ -79,6 +79,7 @@ public class ReflectionUtils {
      * @param paramTypes The types of the parameters of the method, in order
      * @return the method with the specified owner, name and parameter types
      * @throws NoSuchMethodException if a field with the specified name and parameter types could not be found in the specified class
+     * @implNote This method still has the same restrictions as {@link Class#getDeclaredField(String)} in regard to what methods it can find (see {@link jdk.internal.reflect.Reflection#registerMethodsToFilter}).
      */
     public static Method forceGetDeclaredMethod(Class<?> owner, String name, Class<?>... paramTypes) throws NoSuchMethodException {
         Method method = owner.getDeclaredMethod(name, paramTypes);
@@ -93,6 +94,7 @@ public class ReflectionUtils {
      * @param name  The name of the field
      * @return the field with the specified owner and name
      * @throws NoSuchFieldException if a field with the specified name could not be found in the specified class
+     * @implNote This method still has the same restrictions as {@link Class#getDeclaredField(String)} in regard to what fields it can find (see {@link jdk.internal.reflect.Reflection#registerFieldsToFilter}).
      */
     public static Field forceGetDeclaredField(Class<?> owner, String name) throws NoSuchFieldException {
         Field field = owner.getDeclaredField(name);
@@ -102,21 +104,26 @@ public class ReflectionUtils {
 
     /**
      * Gets a field by name and forces it to be accessible. <br>
-     * Use this instead of {@link #forceGetDeclaredField(Class, String)} if the field name is not known.
+     * Use this instead of {@link #forceGetDeclaredField(Class, String)} if the field name is not known. <br>
+     * If there is more than one field with the specified modifiers and type in the target class, <br>
+     * then this method will return the first field with the specified modifiers and type it can find in the target class. <br>
+     * The order in which fields are checked is determined by {@link Class#getDeclaredFields()}.
      *
      * @param owner     The class that declares the field
      * @param modifiers The access modifiers of the field
      * @param type      The type of the field
      * @return the field with the specified owner, access modifiers and type
+     * @throws NoSuchFieldException if a field with the specified type and modifiers could not be found in the specified class
+     * @implNote This method still has the same restrictions as {@link Class#getDeclaredField(String)} in regard to what fields it can find (see {@link jdk.internal.reflect.Reflection#registerFieldsToFilter}).
      */
-    public static Field forceGetDeclaredField(Class<?> owner, int modifiers, Class<?> type) {
+    public static Field forceGetDeclaredField(Class<?> owner, int modifiers, Class<?> type) throws NoSuchFieldException {
         for (Field field : owner.getDeclaredFields()) {
             if (field.getModifiers() == modifiers && field.getType() == type) {
                 forceSetAccessible(field, true);
                 return field;
             }
         }
-        throw new RuntimeException("Failed to get field from " + owner.getName() + " of type" + type.getName());
+        throw new NoSuchFieldException("Failed to get field from " + owner.getName() + " of type" + type.getName());
     }
 
     /**
@@ -338,7 +345,7 @@ public class ReflectionUtils {
             }
         }
 
-        RuntimeException exception = new RuntimeException("Could not find sun.misc.Unsafe instance!");
+        final RuntimeException exception = new RuntimeException("Could not find sun.misc.Unsafe instance!");
         exceptions.forEach(exception::addSuppressed);
         throw exception;
     }
@@ -391,13 +398,13 @@ public class ReflectionUtils {
         try {
             // See MethodHandles.Lookup#TRUSTED
             final int trusted = -1;
-            long overrideOffset = findOverrideOffset();
+            final long overrideOffset = findOverrideOffset();
 
             if (overrideOffset == -1) {
                 throw new RuntimeException("Could not locate AccessibleObject#override!");
             }
 
-            Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
+            final Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
             // We cannot use forceSetAccessible for obvious reasons, so we resort to Unsafe
             UNSAFE.putBoolean(lookupConstructor, overrideOffset, true);
             return lookupConstructor.newInstance(Object.class, null, trusted);
