@@ -149,7 +149,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Exports the specified package from the specified module to all modules.
+     * Exports the specified package from the specified module to the specified module.
      *
      * @param from        The module the package belongs to
      * @param packageName The name of the package
