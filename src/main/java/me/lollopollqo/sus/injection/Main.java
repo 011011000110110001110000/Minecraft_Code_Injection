@@ -27,7 +27,7 @@ public class Main {
 
     public static void main(String[] args) throws RemoteException {
         Thread.currentThread().setName("Main Injector Thread");
-        String agentPath;
+        final String agentPath;
 
         try {
             agentPath = new File(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getAbsolutePath();
@@ -54,7 +54,7 @@ public class Main {
             return;
         }
 
-        VirtualMachine vm;
+        final VirtualMachine vm;
 
         // Attach the agent
         try {
@@ -92,13 +92,13 @@ public class Main {
             return;
         }
 
-        try (Scanner scanner = new Scanner(System.in)) {
+        try (final Scanner scanner = new Scanner(System.in)) {
             final String prefix = "> ";
             System.out.println("You can now send messages to the remote process:");
             while (true) {
                 System.out.print(prefix);
                 if (scanner.hasNextLine()) {
-                    String message = scanner.nextLine();
+                    final String message = scanner.nextLine();
 
                     if (message.equals(STOP_COMMAND)) {
                         try {
