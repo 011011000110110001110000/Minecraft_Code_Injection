@@ -1,5 +1,2 @@
 rootProject.name = 'SusInjection'
-include 'src:main:Agent'
-findProject(':src:main:Agent')?.name = 'Agent'
-include 'Agent'
 
