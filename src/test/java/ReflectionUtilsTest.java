@@ -1,9 +1,7 @@
-import org.jetbrains.annotations.TestOnly;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
-@TestOnly
 public class ReflectionUtilsTest {
 	@Test
 	void testInit() {
