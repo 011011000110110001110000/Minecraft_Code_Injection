@@ -57,7 +57,7 @@ public class ReflectionUtils {
             try {
                 final String packageName = "jdk.internal.misc";
                 final String className = "Unsafe";
-                @SuppressWarnings("Java9ReflectionClassVisibility")
+                //noinspection Java9ReflectionClassVisibility
                 final Class<?> internalUnsafeClass = Class.forName(packageName + "." + className);
                 final Module from = internalUnsafeClass.getModule();
                 final Module to = ReflectionUtils.class.getModule();
@@ -468,7 +468,13 @@ public class ReflectionUtils {
      * Private constructor to prevent instantiation.
      */
     private ReflectionUtils() {
-        throw new AssertionError("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.class));
+        String callerBlame = "";
+        try {
+            callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance().getCallerClass());
+        } catch (IllegalCallerException ignored) {
+
+        }
+        throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.class) + callerBlame);
     }
 
 }
