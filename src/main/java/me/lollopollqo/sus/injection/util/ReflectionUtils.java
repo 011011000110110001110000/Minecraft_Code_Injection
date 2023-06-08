@@ -57,6 +57,7 @@ public class ReflectionUtils {
             try {
                 final String packageName = "jdk.internal.misc";
                 final String className = "Unsafe";
+                @SuppressWarnings("Java9ReflectionClassVisibility")
                 final Class<?> internalUnsafeClass = Class.forName(packageName + "." + className);
                 final Module from = internalUnsafeClass.getModule();
                 final Module to = ReflectionUtils.class.getModule();
