@@ -35,13 +35,29 @@ public class ReflectionUtils {
      */
     private static final MethodHandle setAccessible0;
     /**
-     * Handle for {@link Module#addExportsToAll0(Module, String)}
+     * Handle for {@link Module#implAddExports(String, Module)}
      */
-    private static final MethodHandle addExportsToAll0;
+    private static final MethodHandle addExportsToModule;
     /**
-     * Handle for {@link Module#addExports0(Module, String, Module)}
+     * Handle for {@link Module#implAddExportsToAllUnnamed(String)}
      */
-    private static final MethodHandle addExports0;
+    private static final MethodHandle addExportsToAllUnnamed;
+    /**
+     * Handle for {@link Module#implAddExports(String)}
+     */
+    private static final MethodHandle addExportsToAll;
+    /**
+     * Handle for {@link Module#implAddOpens(String, Module)}
+     */
+    private static final MethodHandle addOpensToModule;
+    /**
+     * Handle for {@link Module#implAddOpensToAllUnnamed(String)}
+     */
+    private static final MethodHandle addOpensToAllUnnamed;
+    /**
+     * Handle for {@link Module#implAddOpens(String)}
+     */
+    private static final MethodHandle addOpensToAll;
 
     static {
         UNSAFE = findUnsafe();
@@ -49,14 +65,19 @@ public class ReflectionUtils {
         LOOKUP = createTrustedLookup();
 
         setAccessible0 = setAccessible0Handle();
-        addExportsToAll0 = addExportsToAll0Handle();
-        addExports0 = addExports0Handle();
+
+        addExportsToModule = addExportsToModuleHandle();
+        addExportsToAllUnnamed = addExportsToAllUnnamedHandle();
+        addExportsToAll = addExportsToAllHandle();
+        addOpensToModule = addOpensToModuleHandle();
+        addOpensToAllUnnamed = addOpensToAllUnnamedHandle();
+        addOpensToAll = addOpensToAllHandle();
 
         // Export the jdk.internal.misc package from the java.base module to the module this class is in, so we can access its contents,
         // then get the jdk.internal.misc.Unsafe instance.
         //
         // Note: At the moment this is not useful, but it's pretty convenient to have the capabilities for doing this,
-        // especially since sun.misc.Unsafe does not expose all the methods in jdk.internal.misc.Unsafe.
+        // especially since sun.misc.Unsafe does not expose a bridge for all the methods in jdk.internal.misc.Unsafe.
         {
             try {
                 final String packageName = "jdk.internal.misc";
@@ -108,7 +129,7 @@ public class ReflectionUtils {
     }
 
     /**
-     * Gets a field by name and forces it to be accessible. <br>
+     * Gets a field with the specified type and access modifiers and forces it to be accessible. <br>
      * Use this instead of {@link #forceGetDeclaredField(Class, String)} if the field name is not known. <br>
      * If there is more than one field with the specified modifiers and type in the target class, <br>
      * then this method will return the first field with the specified modifiers and type it can find in the target class. <br>
@@ -169,9 +190,23 @@ public class ReflectionUtils {
      */
     public static void exportPackageToModule(Module from, String packageName, Module to) {
         try {
-            addExports0.invokeExact(from, packageName, to);
+            addExportsToModule.bindTo(from).invoke(packageName, to);
         } catch (Throwable e) {
             throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to module " + to.getName() + "!", e);
+        }
+    }
+
+    /**
+     * Exports the specified package from the specified module to all <em>unnamed</em> modules.
+     *
+     * @param from        The module the package belongs to
+     * @param packageName The name of the package
+     */
+    public static void exportPackageToAllUnnamed(Module from, String packageName) {
+        try {
+            addExportsToAllUnnamed.bindTo(from).invoke(packageName);
+        } catch (Throwable e) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to all modules!", e);
         }
     }
 
@@ -183,7 +218,50 @@ public class ReflectionUtils {
      */
     public static void exportPackageToAll(Module from, String packageName) {
         try {
-            addExportsToAll0.invokeExact(from, packageName);
+            addExportsToAll.bindTo(from).invoke(packageName);
+        } catch (Throwable e) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to all modules!", e);
+        }
+    }
+
+    /**
+     * Opens the specified package from the specified module to the specified module.
+     *
+     * @param from        The module the package belongs to
+     * @param packageName The name of the package
+     * @param to          The module the package is to be exported to
+     */
+    public static void openPackageToModule(Module from, String packageName, Module to) {
+        try {
+            addOpensToModule.bindTo(from).invoke(packageName, to);
+        } catch (Throwable e) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to module " + to.getName() + "!", e);
+        }
+    }
+
+    /**
+     * Opens the specified package from the specified module to all <em>unnamed</em> modules.
+     *
+     * @param from        The module the package belongs to
+     * @param packageName The name of the package
+     */
+    public static void openPackageToAllUnnamed(Module from, String packageName) {
+        try {
+            addOpensToAllUnnamed.bindTo(from).invoke(packageName);
+        } catch (Throwable e) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to all modules!", e);
+        }
+    }
+
+    /**
+     * Opens the specified package from the specified module to all modules.
+     *
+     * @param from        The module the package belongs to
+     * @param packageName The name of the package
+     */
+    public static void openPackageToAll(Module from, String packageName) {
+        try {
+            addOpensToAll.bindTo(from).invoke(packageName);
         } catch (Throwable e) {
             throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to all modules!", e);
         }
@@ -204,14 +282,6 @@ public class ReflectionUtils {
             return (T) findGetter(owner.getClass(), name, type).invoke(owner);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to get field " + name + " from " + getModuleInclusiveClassName(owner.getClass()), e);
-        }
-    }
-
-    public static void invokeNonStaticVoid(Object owner, String name, MethodType type, Object... arguments) {
-        try {
-            LOOKUP.bind(owner, name, type).invokeWithArguments(arguments);
-        } catch (Throwable e) {
-            throw new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(owner.getClass()) + "." + name + type, e);
         }
     }
 
@@ -478,6 +548,54 @@ public class ReflectionUtils {
             return findStatic(Module.class, "addExportsToAll0", void.class, Module.class, String.class);
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException("Could not get Module#addExportsToAll0(Module, String) handle!", e);
+        }
+    }
+
+    private static MethodHandle addExportsToAllHandle() {
+        try {
+            return findVirtual(Module.class, "implAddExports", void.class, String.class);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Could not get Module#implAddExports(String) handle!", e);
+        }
+    }
+
+    private static MethodHandle addExportsToAllUnnamedHandle() {
+        try {
+            return findVirtual(Module.class, "implAddExportsToAllUnnamed", void.class, String.class);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Could not get Module#implAddExportsToAllUnnamed(String) handle!", e);
+        }
+    }
+
+    private static MethodHandle addExportsToModuleHandle() {
+        try {
+            return findVirtual(Module.class, "implAddExports", void.class, String.class, Module.class);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Could not get Module#implAddExports(String, Module) handle!", e);
+        }
+    }
+
+    private static MethodHandle addOpensToAllHandle() {
+        try {
+            return findVirtual(Module.class, "implAddOpens", void.class, String.class);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Could not get Module#implAddOpens(String) handle!", e);
+        }
+    }
+
+    private static MethodHandle addOpensToAllUnnamedHandle() {
+        try {
+            return findVirtual(Module.class, "implAddOpensToAllUnnamed", void.class, String.class);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Could not get Module#implAddOpensToAllUnnamed(String) handle!", e);
+        }
+    }
+
+    private static MethodHandle addOpensToModuleHandle() {
+        try {
+            return findVirtual(Module.class, "implAddOpens", void.class, String.class, Module.class);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Could not get Module#implAddOpens(String, Module) handle!", e);
         }
     }
 
