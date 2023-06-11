@@ -17,7 +17,7 @@ import java.util.List;
  * @author Lollopollqo
  */
 @SuppressWarnings("unused")
-public class ReflectionUtils {
+public final class ReflectionUtils {
     /**
      * The {@link sun.misc.Unsafe} instance
      */
