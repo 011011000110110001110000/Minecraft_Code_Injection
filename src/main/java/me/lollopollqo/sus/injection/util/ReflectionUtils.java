@@ -19,18 +19,6 @@ import java.util.List;
 @SuppressWarnings("unused")
 public final class ReflectionUtils {
     /**
-     * The {@link sun.misc.Unsafe} instance
-     */
-    private static final sun.misc.Unsafe UNSAFE;
-    /**
-     * The {@link jdk.internal.misc.Unsafe} instance
-     */
-    private static final jdk.internal.misc.Unsafe INTERNAL_UNSAFE;
-    /**
-     * Trusted lookup
-     */
-    private static final MethodHandles.Lookup LOOKUP;
-    /**
      * Handle for {@link AccessibleObject#setAccessible0(boolean)}
      */
     private static final MethodHandle setAccessible0;
@@ -60,10 +48,6 @@ public final class ReflectionUtils {
     private static final MethodHandle addOpensToAll;
 
     static {
-        UNSAFE = findUnsafe();
-
-        LOOKUP = createTrustedLookup();
-
         setAccessible0 = setAccessible0Handle();
 
         addExportsToModule = addExportsToModuleHandle();
@@ -73,28 +57,6 @@ public final class ReflectionUtils {
         addOpensToAllUnnamed = addOpensToAllUnnamedHandle();
         addOpensToAll = addOpensToAllHandle();
 
-        // Export the jdk.internal.misc package from the java.base module to the module this class is in, so we can access its contents,
-        // then get the jdk.internal.misc.Unsafe instance.
-        //
-        // Note: At the moment this is not useful, but it's pretty convenient to have the capabilities for doing this,
-        // especially since sun.misc.Unsafe does not expose a bridge for all the methods in jdk.internal.misc.Unsafe.
-        {
-            try {
-                final String packageName = "jdk.internal.misc";
-                final String className = "Unsafe";
-                // IDEA obviously can't know that we are going to be able to access the class
-                //noinspection Java9ReflectionClassVisibility
-                final Class<?> internalUnsafeClass = Class.forName(packageName + "." + className);
-                final Module from = internalUnsafeClass.getModule();
-                final Module to = ReflectionUtils.class.getModule();
-
-                exportPackageToModule(from, packageName, to);
-            } catch (ClassNotFoundException cnfe) {
-                throw new RuntimeException("Could not export jdk.internal.misc to module " + ReflectionUtils.class.getModule().getName() + "!", cnfe);
-            }
-            // No need to do anything fancy to get access to this now that we've exported the package
-            INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
-        }
     }
 
     /**
@@ -292,14 +254,14 @@ public final class ReflectionUtils {
 
     public static Object invokeNonStatic(Object owner, String name, MethodType type, Object... arguments) {
         try {
-            return LOOKUP.bind(owner, name, type).invokeWithArguments(arguments);
+            return MethodHandleHelper.LOOKUP.bind(owner, name, type).invokeWithArguments(arguments);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(owner.getClass()) + "." + name + type, e);
         }
     }
 
     public static MethodHandle findGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return LOOKUP.in(owner).findGetter(owner, name, type);
+        return MethodHandleHelper.LOOKUP.in(owner).findGetter(owner, name, type);
     }
 
     public static <O, T extends O> MethodHandle findGetterAndBind(Class<T> owner, O instance, String name, Class<?> type) throws ReflectiveOperationException {
@@ -307,11 +269,11 @@ public final class ReflectionUtils {
     }
 
     public static MethodHandle findStaticGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return LOOKUP.in(owner).findStaticGetter(owner, name, type);
+        return MethodHandleHelper.LOOKUP.in(owner).findStaticGetter(owner, name, type);
     }
 
     public static MethodHandle findSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return LOOKUP.in(owner).findSetter(owner, name, type);
+        return MethodHandleHelper.LOOKUP.in(owner).findSetter(owner, name, type);
     }
 
     public static <O, T extends O> MethodHandle findSetterAndBind(Class<T> owner, O instance, String name, Class<?> type) throws ReflectiveOperationException {
@@ -319,7 +281,7 @@ public final class ReflectionUtils {
     }
 
     public static MethodHandle findStaticSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return LOOKUP.in(owner).findStaticSetter(owner, name, type);
+        return MethodHandleHelper.LOOKUP.in(owner).findStaticSetter(owner, name, type);
     }
 
     public static <T> Class<T> loadClass(String name) throws ReflectiveOperationException {
@@ -336,7 +298,7 @@ public final class ReflectionUtils {
     }
 
     public static MethodHandle findVirtual(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
-        return LOOKUP.in(owner).findVirtual(owner, name, type);
+        return MethodHandleHelper.LOOKUP.in(owner).findVirtual(owner, name, type);
     }
 
     public static <O, T extends O> MethodHandle findVirtualAndBind(Class<T> owner, O instance, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
@@ -348,7 +310,7 @@ public final class ReflectionUtils {
     }
 
     public static MethodHandle findStatic(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
-        return LOOKUP.in(owner).findStatic(owner, name, MethodType.methodType(returnType, params));
+        return MethodHandleHelper.LOOKUP.in(owner).findStatic(owner, name, MethodType.methodType(returnType, params));
     }
 
     /**
@@ -360,7 +322,7 @@ public final class ReflectionUtils {
     @NotNull
     public static <T> Class<T> ensureInitialized(@NotNull Class<T> clazz) {
         try {
-            LOOKUP.in(clazz).ensureInitialized(clazz);
+            MethodHandleHelper.LOOKUP.in(clazz).ensureInitialized(clazz);
         } catch (IllegalAccessException e) {
             throw new RuntimeException("Failed to ensure " + getModuleInclusiveClassName(clazz) + " was initialized", e);
         }
@@ -391,123 +353,6 @@ public final class ReflectionUtils {
     @NotNull
     public static String getModuleInclusiveClassName(@NotNull Class<?> clazz) {
         return clazz.getModule().getName() + '/' + clazz.getName();
-    }
-
-    /* This section contains the hacks that make this whole class work */
-
-    /**
-     * Gets a reference to the {@link sun.misc.Unsafe} instance in a JDK agnostic way, which means not relying on the field name.
-     *
-     * @return the {@link sun.misc.Unsafe} instance
-     */
-    private static sun.misc.Unsafe findUnsafe() {
-        final int unsafeModifiers = Modifier.STATIC | Modifier.FINAL;
-        final List<Throwable> exceptions = new ArrayList<>();
-
-        // We cannot rely on the field name, as it is different in various JDK implementations
-        for (Field field : sun.misc.Unsafe.class.getDeclaredFields()) {
-
-            // Verify that the field is of the correct type and has the correct access modifiers
-            if (field.getType() != sun.misc.Unsafe.class || (field.getModifiers() & unsafeModifiers) != unsafeModifiers) {
-                continue;
-            }
-
-            try {
-                // Thankfully don't need to do anything fancy to set the field to be accessible
-                // since the jdk.unsupported module exports and opens the sun.misc package to all modules
-                field.setAccessible(true);
-                if (field.get(null) instanceof sun.misc.Unsafe unsafe) {
-                    return unsafe;
-                }
-            } catch (Throwable e) {
-                exceptions.add(e);
-            }
-        }
-
-        // If we couldn't find the field, throw an exception
-        final RuntimeException exception = new RuntimeException("Could not find sun.misc.Unsafe instance!");
-        exceptions.forEach(exception::addSuppressed);
-        throw exception;
-    }
-
-    /**
-     * Finds the offset of the {@link AccessibleObject#override} field in an {@link AccessibleObject} instance.
-     *
-     * @return the offset of the {@link AccessibleObject#override} field of an {@link AccessibleObject} instance, <br>
-     * or <code>-1</code> if the offset could not be determined
-     */
-    private static long findOverrideOffset() {
-        long overrideOffset = -1;
-        final AccessibleObject object = allocateInstance(AccessibleObject.class);
-        // 4 byte mark word (32 bit machine) and 4 byte klass word
-        final int minHeaderSizeBytes = 8;
-
-        /*
-         * As of JDK 17, there's technically no need to check up to 64 bytes because the object header is at most 12 bytes
-         * (12 bytes on a 64 bit machine, 8 bytes on a 32 bit machine), and the AccessibleObject class only declares a singular boolean field
-         * (the override field which we are interested in).
-         *
-         * This means that the offset should always be the size of the object header, but in case a few more fields are introduced in later JDK versions
-         * this code tries to account for it.
-         */
-        for (int currentOffset = minHeaderSizeBytes; currentOffset <= 64; currentOffset++) {
-            // Set the override field to false
-            object.setAccessible(false);
-            // If the boolean value at the current offset is true, then it means it is not the override field, so keep trying
-            if (UNSAFE.getBoolean(object, currentOffset)) {
-                continue;
-            }
-            // Change the value of the override field to true
-            object.setAccessible(true);
-            // If the boolean value at the current offset is now true, then it means we found the override field
-            if (UNSAFE.getBoolean(object, currentOffset)) {
-                overrideOffset = currentOffset;
-                break;
-            }
-        }
-
-        return overrideOffset;
-    }
-
-    /**
-     * Constructs a {@link MethodHandles.Lookup} instance with <code>TRUSTED</code> access.
-     *
-     * @return the created {@link MethodHandles.Lookup} instance
-     */
-    private static MethodHandles.Lookup createTrustedLookup() {
-        try {
-            // See MethodHandles.Lookup#TRUSTED
-            final int trusted = -1;
-            final long overrideOffset = findOverrideOffset();
-
-            if (overrideOffset == -1) {
-                throw new RuntimeException("Could not locate AccessibleObject#override!");
-            }
-
-            final Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
-            // We cannot use forceSetAccessible for obvious reasons, so we resort to Unsafe
-            UNSAFE.putBoolean(lookupConstructor, overrideOffset, true);
-            return lookupConstructor.newInstance(Object.class, null, trusted);
-        } catch (ReflectiveOperationException roe) {
-            throw new RuntimeException("Could not create trusted lookup!", roe);
-        }
-    }
-
-    /**
-     * Allocates a new instance of the given class, throwing a {@link RuntimeException} if an {@link InstantiationException} occurs.
-     *
-     * @param clazz The class a new instance of which is to be created
-     * @return the allocated instance
-     * @see jdk.internal.misc.Unsafe#allocateInstance(Class)
-     */
-    @SuppressWarnings({"unchecked", "SameParameterValue"})
-    @NotNull
-    private static <T> T allocateInstance(@NotNull Class<T> clazz) {
-        try {
-            return (T) UNSAFE.allocateInstance(clazz);
-        } catch (InstantiationException ie) {
-            throw new RuntimeException("Failed to allocate instance of " + getModuleInclusiveClassName(clazz), ie);
-        }
     }
 
     /* Caching for important MethodHandles */
@@ -612,4 +457,205 @@ public final class ReflectionUtils {
         throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.class) + callerBlame);
     }
 
+    /**
+     * Helper class that makes working with {@link MethodHandle}s easier. <br>
+     *
+     * @apiNote Due to the different implementation of {@link MethodHandles.Lookup}, this class is not compatible with <a href="https://www.eclipse.org/openj9/">OpenJ9</a> VMs.
+     *
+     * @author Lollopollqo
+     */
+    private static final class MethodHandleHelper {
+
+        /**
+         * Trusted lookup
+         */
+        private static final MethodHandles.Lookup LOOKUP;
+
+        static {
+            LOOKUP = getTrustedLookup();
+        }
+
+        /**
+         * Gets or creates a {@link MethodHandles.Lookup} instance with <code>TRUSTED</code> access.
+         *
+         * @return the {@link MethodHandles.Lookup} instance
+         */
+        private static MethodHandles.Lookup getTrustedLookup() {
+            MethodHandles.Lookup implLookup;
+            try {
+                try {
+                    // Get the trusted lookup via reflection
+                    final Field implLookupField = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
+                    UnsafeHelper.unsafeSetAccesible(implLookupField, true);
+                    implLookup = (MethodHandles.Lookup) implLookupField.get(null);
+                } catch (ReflectiveOperationException roe) {
+                    // If for some reason we couldn't get the trusted lookup via reflection, create a new trusted instance ourselves
+
+                    // See MethodHandles.Lookup#TRUSTED
+                    final int trusted = -1;
+                    final long overrideOffset = UnsafeHelper.INTERNAL_UNSAFE.objectFieldOffset(AccessibleObject.class, "override");
+
+                    if (overrideOffset == -1) {
+                        throw new RuntimeException("Could not locate AccessibleObject#override!");
+                    }
+
+                    final Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
+
+                    UnsafeHelper.unsafeSetAccesible(lookupConstructor, true);
+                    implLookup = lookupConstructor.newInstance(Object.class, null, trusted);
+                }
+            } catch (ReflectiveOperationException roe) {
+                throw new RuntimeException("Could not create trusted lookup!", roe);
+            }
+
+            return implLookup;
+        }
+    }
+
+    /**
+     * Helper class that simplifies the process of bypassing module access checks <br>
+     * (meaning exporting / opening packages to modules they aren't normally exported / opened to).
+     *
+     * @author Lollopollqo
+     */
+    static final class ModuleHelper {
+        /**
+         * An instance of {@link ModuleLayer.Controller}, used to export / open packages without restrictions
+         */
+        private static final ModuleLayer.Controller layerController;
+        /**
+         * The cached offset (in bytes) for the {@link ModuleLayer.Controller#layer} field in a {@link ModuleLayer.Controller} instance
+         */
+        private static final long layerFieldOffset;
+
+        static {
+            try {
+                layerController = (ModuleLayer.Controller) UnsafeHelper.UNSAFE.allocateInstance(ModuleLayer.Controller.class);
+                layerFieldOffset = UnsafeHelper.UNSAFE.objectFieldOffset(ModuleLayer.Controller.class.getDeclaredField("layer"));
+            } catch (ReflectiveOperationException roe) {
+                throw new RuntimeException(roe);
+            }
+        }
+
+        private static void addExports(Module source, String packageName, Module target) {
+            UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
+            layerController.addExports(source, packageName, target);
+        }
+
+        private static void addOpens(Module source, String packageName, Module target) {
+            UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
+            layerController.addOpens(source, packageName, target);
+        }
+    }
+
+    /**
+     * Helper class that holds references to the {@link sun.misc.Unsafe} and {@link jdk.internal.misc.Unsafe} instances. <br>
+     * This class also contains a few methods that make working with the two <code>Unsafe</code> classes easier.
+     *
+     * @author Lollopollqo
+     */
+    public static final class UnsafeHelper {
+        /**
+         * The {@link sun.misc.Unsafe} instance
+         */
+        private static final sun.misc.Unsafe UNSAFE;
+        /**
+         * The {@link jdk.internal.misc.Unsafe} instance
+         */
+        private static final jdk.internal.misc.Unsafe INTERNAL_UNSAFE;
+        /**
+         * The cached offset (in bytes) of the {@link AccessibleObject#override} field in an {@link AccessibleObject} instance
+         */
+        private static final long overrideOffset;
+
+        static {
+            // Needs to be done before calling enableJdkInternalsAccess() as it uses the sun.misc.Unsafe instance
+            UNSAFE = findUnsafe();
+            enableJdkInternalsAccess();
+            INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
+            // Bypass reflection filters by using the jdk.internal.misc.Unsafe instance
+            overrideOffset = INTERNAL_UNSAFE.objectFieldOffset(AccessibleObject.class, "override");
+        }
+
+        /**
+         * Forces the given {@link AccessibleObject} instance to have the desired accessibility. <br>
+         * Unlike {@link AccessibleObject#setAccessible(boolean)}, this method does not perform any permission checks.
+         *
+         * @param object     The object whose accessibility is to be forcefully set
+         * @param accessible the accessibility to be forcefully set
+         * @implNote As the name of the method suggests, this makes use of {@link jdk.internal.misc.Unsafe} to bypass any access checks.
+         */
+        @SuppressWarnings("SameParameterValue")
+        private static void unsafeSetAccesible(AccessibleObject object, boolean accessible) {
+            INTERNAL_UNSAFE.putBoolean(object, overrideOffset, accessible);
+        }
+
+        /**
+         * Gets a reference to the {@link sun.misc.Unsafe} instance without relying on the field name.
+         *
+         * @return the {@link sun.misc.Unsafe} instance
+         */
+        private static sun.misc.Unsafe findUnsafe() {
+            final int unsafeModifiers = Modifier.STATIC | Modifier.FINAL;
+            final List<Throwable> exceptions = new ArrayList<>();
+
+            // We cannot rely on the field name, as it is an implementation detail and as such it can be different from version to version
+            for (Field field : sun.misc.Unsafe.class.getDeclaredFields()) {
+
+                // Verify that the field is of the correct type and has the correct access modifiers
+                if (field.getType() != sun.misc.Unsafe.class || (field.getModifiers() & unsafeModifiers) != unsafeModifiers) {
+                    continue;
+                }
+
+                try {
+                    // Thankfully don't need to do anything fancy to set the field to be accessible
+                    // since the jdk.unsupported module exports and opens the sun.misc package to all modules
+                    field.setAccessible(true);
+                    if (field.get(null) instanceof sun.misc.Unsafe unsafe) {
+                        return unsafe;
+                    }
+                } catch (Throwable e) {
+                    exceptions.add(e);
+                }
+            }
+
+            // If we couldn't find the field, throw an exception
+            final RuntimeException exception = new RuntimeException("Could not find sun.misc.Unsafe instance!");
+            exceptions.forEach(exception::addSuppressed);
+            throw exception;
+        }
+
+        /**
+         * Export the {@link jdk.internal.misc} and {@link jdk.internal.access} packages to this class' module.
+         */
+        private static void enableJdkInternalsAccess() {
+            final String internalPackageName = "jdk.internal";
+            final String miscPackageName = internalPackageName + ".misc";
+            final String accessPackageName = internalPackageName + ".access";
+            final String moduleName = "java.base";
+            final Module javaBaseModule = Object.class.getModule().getLayer().findModule(moduleName).orElseThrow(
+                    () -> new RuntimeException("Could not find module " + moduleName + "!")
+            );
+
+            ModuleHelper.addExports(javaBaseModule, miscPackageName, UnsafeHelper.class.getModule());
+            ModuleHelper.addExports(javaBaseModule, accessPackageName, UnsafeHelper.class.getModule());
+        }
+
+        /**
+         * Allocates a new instance of the given class, throwing a {@link RuntimeException} if an {@link InstantiationException} occurs.
+         *
+         * @param clazz The class a new instance of which is to be created
+         * @return the allocated instance
+         * @see jdk.internal.misc.Unsafe#allocateInstance(Class)
+         */
+        @SuppressWarnings("unchecked")
+        @NotNull
+        private static <T> T allocateInstance(@NotNull Class<T> clazz) {
+            try {
+                return (T) INTERNAL_UNSAFE.allocateInstance(clazz);
+            } catch (InstantiationException ie) {
+                throw new RuntimeException("Failed to allocate instance of " + getModuleInclusiveClassName(clazz), ie);
+            }
+        }
+    }
 }
