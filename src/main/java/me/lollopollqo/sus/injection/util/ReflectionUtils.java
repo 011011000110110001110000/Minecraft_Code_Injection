@@ -23,7 +23,8 @@ public final class ReflectionUtils {
 
     static {
         // Ensure UnsafeHelper's initializer is invoked before the other Helper classes' ones by accessing a static member.
-        // We do it this way instead of using  Class.forName(String) so we can check for illegal initializations from outside this class in the UnsafeHelper initializer.
+        // We do it this way instead of using  Class.forName(String) so we can check for illegal initializations from outside this class in the UnsafeHelper initializer
+        // (and also to avoid having a hardcoded string with the fully qualified class name in case this ever gets relocated).
         // This is essential to avoid an access violation error happening due to incorrect classloading order.
         sun.misc.Unsafe unsafe = UnsafeHelper.UNSAFE;
 
