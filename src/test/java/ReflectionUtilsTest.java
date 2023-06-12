@@ -1,11 +1,10 @@
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 public class ReflectionUtilsTest {
 	@Test
 	void testInit() {
-		assertDoesNotThrow(
+		Assertions.assertDoesNotThrow(
 			() -> {
 				Class<?> classReflectionUtils = null;
 				try {
