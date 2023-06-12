@@ -12,51 +12,23 @@ import java.util.List;
 /**
  * <b>WIP</b> <br>
  * TODO: documentation, more helpers for internal methods <br>
- * Helper class that contains some useful methods for easier / more powerful reflection usage. <br>
+ * Utility class that contains some useful methods for easier / more powerful reflection usage. <br>
  *
  * @author Lollopollqo
+ * @apiNote Due to the different implementation of {@link MethodHandles.Lookup}, this class is not compatible with <br>
+ * <a href="https://www.eclipse.org/openj9/">OpenJ9</a> VMs (see {@link MethodHandleHelper}).
  */
 @SuppressWarnings("unused")
 public final class ReflectionUtils {
-    /**
-     * Handle for {@link AccessibleObject#setAccessible0(boolean)}
-     */
-    private static final MethodHandle setAccessible0;
-    /**
-     * Handle for {@link Module#implAddExports(String, Module)}
-     */
-    private static final MethodHandle addExportsToModule;
-    /**
-     * Handle for {@link Module#implAddExportsToAllUnnamed(String)}
-     */
-    private static final MethodHandle addExportsToAllUnnamed;
-    /**
-     * Handle for {@link Module#implAddExports(String)}
-     */
-    private static final MethodHandle addExportsToAll;
-    /**
-     * Handle for {@link Module#implAddOpens(String, Module)}
-     */
-    private static final MethodHandle addOpensToModule;
-    /**
-     * Handle for {@link Module#implAddOpensToAllUnnamed(String)}
-     */
-    private static final MethodHandle addOpensToAllUnnamed;
-    /**
-     * Handle for {@link Module#implAddOpens(String)}
-     */
-    private static final MethodHandle addOpensToAll;
 
     static {
-        setAccessible0 = setAccessible0Handle();
+        // Ensure UnsafeHelper's initializer is invoked before the other Helper classes' ones by accessing a static member.
+        // We do it this way instead of using  Class.forName(String) so we can check for illegal initializations from outside this class in the UnsafeHelper initializer.
+        // This is essential to avoid an access violation error happening due to incorrect classloading order.
+        sun.misc.Unsafe unsafe = UnsafeHelper.UNSAFE;
 
-        addExportsToModule = addExportsToModuleHandle();
-        addExportsToAllUnnamed = addExportsToAllUnnamedHandle();
-        addExportsToAll = addExportsToAllHandle();
-        addOpensToModule = addOpensToModuleHandle();
-        addOpensToAllUnnamed = addOpensToAllUnnamedHandle();
-        addOpensToAll = addOpensToAllHandle();
-
+        // Handle this here to ensure it only happens after all the necessary initialization steps have happened
+        ModuleHelper.getSpecialModules();
     }
 
     /**
@@ -102,7 +74,7 @@ public final class ReflectionUtils {
      * @param type      The type of the field
      * @return the field with the specified owner, access modifiers and type
      * @throws NoSuchFieldException if a field with the specified type and modifiers could not be found in the specified class
-     * @implNote This method still has the same restrictions as {@link Class#getDeclaredField(String)} in regard to what fields it can find (see {@link jdk.internal.reflect.Reflection#registerFieldsToFilter}).
+     * @implNote This method still has the same restrictions as {@link Class#getDeclaredFields()} in regard to what fields it can find (see {@link jdk.internal.reflect.Reflection#registerFieldsToFilter}).
      */
     public static Field forceGetDeclaredField(Class<?> owner, int modifiers, Class<?> type) throws NoSuchFieldException {
         for (Field field : owner.getDeclaredFields()) {
@@ -119,7 +91,6 @@ public final class ReflectionUtils {
      *
      * @param object     The object whose accessibility is to be forcefully set
      * @param accessible The accessibility to be forcefully set
-     * @see #setAccessible0
      */
     @SuppressWarnings("SameParameterValue")
     private static void forceSetAccessible(AccessibleObject object, boolean accessible) {
@@ -132,12 +103,13 @@ public final class ReflectionUtils {
      *
      * @param object     The object whose accessibility is to be forcefully set
      * @param accessible the accessibility to be forcefully set
-     * @return the value of the <code>accessible</code> argument
+     * @return <code>accessible</code>
      */
     @SuppressWarnings("UnusedReturnValue")
     public static boolean setAccessible(AccessibleObject object, boolean accessible) {
         try {
-            return (boolean) setAccessible0.bindTo(object).invokeExact(accessible);
+            UnsafeHelper.unsafeSetAccesible(object, accessible);
+            return accessible;
         } catch (Throwable e) {
             throw new RuntimeException("Could not force the accessibility of " + object + " to be set to " + accessible, e);
         }
@@ -146,86 +118,92 @@ public final class ReflectionUtils {
     /**
      * Exports the specified package from the specified module to the specified module.
      *
-     * @param from        The module the package belongs to
+     * @param source      The module the package belongs to
      * @param packageName The name of the package
-     * @param to          The module the package is to be exported to
+     * @param target      The module the package is to be exported to
+     * @see ModuleHelper#addExports(Module, String, Module)
      */
-    public static void exportPackageToModule(Module from, String packageName, Module to) {
+    public static void addExports(Module source, String packageName, Module target) {
         try {
-            addExportsToModule.bindTo(from).invoke(packageName, to);
-        } catch (Throwable e) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to module " + to.getName() + "!", e);
+            ModuleHelper.addExports(source, packageName, target);
+        } catch (Throwable t) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to module " + target.getName() + "!", t);
         }
     }
 
     /**
      * Exports the specified package from the specified module to all <em>unnamed</em> modules.
      *
-     * @param from        The module the package belongs to
+     * @param source      The module the package belongs to
      * @param packageName The name of the package
+     * @see ModuleHelper#addExportsToAllUnnamed(Module, String)
      */
-    public static void exportPackageToAllUnnamed(Module from, String packageName) {
+    public static void addExportsToAllUnnamed(Module source, String packageName) {
         try {
-            addExportsToAllUnnamed.bindTo(from).invoke(packageName);
-        } catch (Throwable e) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to all modules!", e);
+            ModuleHelper.addExportsToAllUnnamed(source, packageName);
+        } catch (Throwable t) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules!", t);
         }
     }
 
     /**
      * Exports the specified package from the specified module to all modules.
      *
-     * @param from        The module the package belongs to
+     * @param source      The module the package belongs to
      * @param packageName The name of the package
+     * @see ModuleHelper#addExports(Module, String)
      */
-    public static void exportPackageToAll(Module from, String packageName) {
+    public static void addExports(Module source, String packageName) {
         try {
-            addExportsToAll.bindTo(from).invoke(packageName);
-        } catch (Throwable e) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to all modules!", e);
+            ModuleHelper.addExports(source, packageName);
+        } catch (Throwable t) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules!", t);
         }
     }
 
     /**
      * Opens the specified package from the specified module to the specified module.
      *
-     * @param from        The module the package belongs to
+     * @param source      The module the package belongs to
      * @param packageName The name of the package
-     * @param to          The module the package is to be exported to
+     * @param target      The module the package is to be opened to
+     * @see ModuleHelper#addOpens(Module, String, Module)
      */
-    public static void openPackageToModule(Module from, String packageName, Module to) {
+    public static void addOpens(Module source, String packageName, Module target) {
         try {
-            addOpensToModule.bindTo(from).invoke(packageName, to);
-        } catch (Throwable e) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to module " + to.getName() + "!", e);
+            ModuleHelper.addOpens(source, packageName, target);
+        } catch (Throwable t) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to module " + target.getName() + "!", t);
         }
     }
 
     /**
      * Opens the specified package from the specified module to all <em>unnamed</em> modules.
      *
-     * @param from        The module the package belongs to
+     * @param source      The module the package belongs to
      * @param packageName The name of the package
+     * @see ModuleHelper#addOpensToAllUnnamed(Module, String)
      */
-    public static void openPackageToAllUnnamed(Module from, String packageName) {
+    public static void addOpensToAllUnnamed(Module source, String packageName) {
         try {
-            addOpensToAllUnnamed.bindTo(from).invoke(packageName);
-        } catch (Throwable e) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to all modules!", e);
+            ModuleHelper.addOpensToAllUnnamed(source, packageName);
+        } catch (Throwable t) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules!", t);
         }
     }
 
     /**
-     * Opens the specified package from the specified module to all modules.
+     * Opens the specified package from the specified module to <em>all</em> modules.
      *
-     * @param from        The module the package belongs to
+     * @param source      The module the package belongs to
      * @param packageName The name of the package
+     * @see ModuleHelper#addOpens(Module, String)
      */
-    public static void openPackageToAll(Module from, String packageName) {
+    public static void addOpens(Module source, String packageName) {
         try {
-            addOpensToAll.bindTo(from).invoke(packageName);
-        } catch (Throwable e) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + from.getName() + " to all modules!", e);
+            ModuleHelper.addOpens(source, packageName);
+        } catch (Throwable t) {
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules!", t);
         }
     }
 
@@ -247,11 +225,30 @@ public final class ReflectionUtils {
         }
     }
 
+    /**
+     * Invokes the non-static method with the given name, arguments and return type on the given object.
+     *
+     * @param owner         The object to invoke the method on
+     * @param name          The name of the method
+     * @param returnType    The return type of the method
+     * @param argumentTypes The argument types of the method
+     * @param arguments     The arguments to use when invoking the method
+     * @return the value returned by the method, cast to the appropriate type
+     */
     @SuppressWarnings("unchecked")
     public static <T> T invokeNonStatic(Object owner, String name, Class<T> returnType, Class<?>[] argumentTypes, Object... arguments) {
         return (T) invokeNonStatic(owner, name, MethodType.methodType(returnType, argumentTypes));
     }
 
+    /**
+     * Invokes the non-static method with the given name, arguments and return type on the given object.
+     *
+     * @param owner     The object to invoke the method on
+     * @param name      The name of the method
+     * @param type      The {@link MethodType} that describes the method
+     * @param arguments The arguments to use when invoking the method
+     * @return the value returned by the method as an {@link Object}
+     */
     public static Object invokeNonStatic(Object owner, String name, MethodType type, Object... arguments) {
         try {
             return MethodHandleHelper.LOOKUP.bind(owner, name, type).invokeWithArguments(arguments);
@@ -260,14 +257,68 @@ public final class ReflectionUtils {
         }
     }
 
+    /**
+     * Produces a method handle giving read access to a non-static field.
+     * The type of the method handle will have a return type of the field's
+     * value type.
+     * The method handle's single argument will be the instance containing
+     * the field.
+     * Access checking is performed immediately on behalf of the lookup class.
+     *
+     * @param owner The class or interface from which the method is accessed
+     * @param name  The field's name
+     * @param type  The field's type
+     * @return a method handle which can load values from the field
+     * @throws NoSuchFieldException   if the field does not exist
+     * @throws IllegalAccessException if access checking fails, or if the field is {@code static}
+     * @see java.lang.invoke.MethodHandles.Lookup#findGetter(Class, String, Class)
+     */
     public static MethodHandle findGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
         return MethodHandleHelper.LOOKUP.in(owner).findGetter(owner, name, type);
     }
 
+    /**
+     * Produces a method handle giving read access to a non-static field, and binds it <br>
+     * to the given <code>instance</code>. <br>
+     * The type of the method handle will have a return type of the field's
+     * value type. <br>
+     * The method handle's single argument will be the instance containing
+     * the field. <br>
+     * Access checking is performed immediately on behalf of the lookup class. <br>
+     *
+     * @param owner    The class or interface from which the method is accessed
+     * @param instance The instance that the method handle will be bound to
+     * @param name     The field's name
+     * @param type     The field's type
+     * @return a method handle which can load values from the field
+     * @throws NoSuchFieldException     if the field does not exist
+     * @throws IllegalAccessException   if access checking fails, or if the field is {@code static}
+     * @throws IllegalArgumentException if the target does not have a leading parameter type that is a reference type
+     * @throws ClassCastException       if {@code instance} cannot be converted to the leading parameter type of the target
+     * @see #findGetter(Class, String, Class)
+     * @see java.lang.invoke.MethodHandle#bindTo(Object)
+     */
     public static <O, T extends O> MethodHandle findGetterAndBind(Class<T> owner, O instance, String name, Class<?> type) throws ReflectiveOperationException {
         return findGetter(owner, name, type).bindTo(instance);
     }
 
+    /**
+     * Produces a method handle giving read access to a static field. <br>
+     * The type of the method handle will have a return type of the field's
+     * value type. <br>
+     * The method handle will take no arguments. <br>
+     * Access checking is performed immediately on behalf of the lookup class. <br>
+     * <br>
+     * If the returned method handle is invoked, the field's class will
+     * be initialized, if it has not already been initialized. <br>
+     *
+     * @param owner The class or interface from which the method is accessed
+     * @param name  The field's name
+     * @param type  The field's type
+     * @return a method handle which can load values from the field
+     * @throws NoSuchFieldException   if the field does not exist
+     * @throws IllegalAccessException if access checking fails, or if the field is not {@code static}
+     */
     public static MethodHandle findStaticGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
         return MethodHandleHelper.LOOKUP.in(owner).findStaticGetter(owner, name, type);
     }
@@ -284,12 +335,29 @@ public final class ReflectionUtils {
         return MethodHandleHelper.LOOKUP.in(owner).findStaticSetter(owner, name, type);
     }
 
-    public static <T> Class<T> loadClass(String name) throws ReflectiveOperationException {
+    /**
+     * Loads the class with the given name using this class' {@link ClassLoader}.
+     *
+     * @param name The name of the class
+     * @return the loaded class
+     * @throws ClassNotFoundException if the class can not be found
+     * @see #loadClass(ClassLoader, String)
+     */
+    public static <T> Class<T> loadClass(String name) throws ClassNotFoundException {
         return loadClass(ReflectionUtils.class.getClassLoader(), name);
     }
 
+    /**
+     * Loads the class with the given name using the given {@link ClassLoader}.
+     *
+     * @param loader The class loader to use for loading the class
+     * @param name   The name of the class
+     * @return the loaded class
+     * @throws ClassNotFoundException if the class can not be found
+     * @see ClassLoader#loadClass(String)
+     */
     @SuppressWarnings("unchecked")
-    public static <T> Class<T> loadClass(ClassLoader loader, String name) throws ReflectiveOperationException {
+    public static <T> Class<T> loadClass(ClassLoader loader, String name) throws ClassNotFoundException {
         return (Class<T>) loader.loadClass(name);
     }
 
@@ -355,102 +423,13 @@ public final class ReflectionUtils {
         return clazz.getModule().getName() + '/' + clazz.getName();
     }
 
-    /* Caching for important MethodHandles */
-
-    /**
-     * Gets a {@link MethodHandle} for {@link Module#addExportsToAll0(Module, String)}.
-     *
-     * @return the acquired {@link MethodHandle}
-     */
-    private static MethodHandle setAccessible0Handle() {
-        try {
-            return findVirtual(AccessibleObject.class, "setAccessible0", boolean.class, boolean.class);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get AccessibleObject#setAccessible0 handle!", e);
-        }
-    }
-
-    /**
-     * Gets a {@link MethodHandle} for {@link Module#addExports0(Module, String, Module)}.
-     *
-     * @return the acquired {@link MethodHandle}
-     */
-    private static MethodHandle addExports0Handle() {
-        try {
-            return findStatic(Module.class, "addExports0", void.class, Module.class, String.class, Module.class);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get Module#addExports0(Module, String, Module) handle!", e);
-        }
-    }
-
-    /**
-     * Gets a {@link MethodHandle} for {@link Module#addExportsToAll0(Module, String)}.
-     *
-     * @return the acquired {@link MethodHandle}
-     */
-    private static MethodHandle addExportsToAll0Handle() {
-        try {
-            return findStatic(Module.class, "addExportsToAll0", void.class, Module.class, String.class);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get Module#addExportsToAll0(Module, String) handle!", e);
-        }
-    }
-
-    private static MethodHandle addExportsToAllHandle() {
-        try {
-            return findVirtual(Module.class, "implAddExports", void.class, String.class);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get Module#implAddExports(String) handle!", e);
-        }
-    }
-
-    private static MethodHandle addExportsToAllUnnamedHandle() {
-        try {
-            return findVirtual(Module.class, "implAddExportsToAllUnnamed", void.class, String.class);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get Module#implAddExportsToAllUnnamed(String) handle!", e);
-        }
-    }
-
-    private static MethodHandle addExportsToModuleHandle() {
-        try {
-            return findVirtual(Module.class, "implAddExports", void.class, String.class, Module.class);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get Module#implAddExports(String, Module) handle!", e);
-        }
-    }
-
-    private static MethodHandle addOpensToAllHandle() {
-        try {
-            return findVirtual(Module.class, "implAddOpens", void.class, String.class);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get Module#implAddOpens(String) handle!", e);
-        }
-    }
-
-    private static MethodHandle addOpensToAllUnnamedHandle() {
-        try {
-            return findVirtual(Module.class, "implAddOpensToAllUnnamed", void.class, String.class);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get Module#implAddOpensToAllUnnamed(String) handle!", e);
-        }
-    }
-
-    private static MethodHandle addOpensToModuleHandle() {
-        try {
-            return findVirtual(Module.class, "implAddOpens", void.class, String.class, Module.class);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get Module#implAddOpens(String, Module) handle!", e);
-        }
-    }
-
     /**
      * Private constructor to prevent instantiation.
      */
     private ReflectionUtils() {
         String callerBlame = "";
         try {
-            callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance().getCallerClass());
+            callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
         } catch (IllegalCallerException ignored) {
 
         }
@@ -460,18 +439,38 @@ public final class ReflectionUtils {
     /**
      * Helper class that makes working with {@link MethodHandle}s easier. <br>
      *
-     * @apiNote Due to the different implementation of {@link MethodHandles.Lookup}, this class is not compatible with <a href="https://www.eclipse.org/openj9/">OpenJ9</a> VMs.
-     *
      * @author Lollopollqo
+     * @apiNote Due to the different implementation of {@link MethodHandles.Lookup}, this class is not compatible with <a href="https://www.eclipse.org/openj9/">OpenJ9</a> VMs. <br>
+     * This is due to the fact that in the OpenJ9 implementation access modes are different, <br>
+     * and teleporting the lookup removes permissions even if the lookup object has full privileges. <br>
+     * Technically, if we manage to get hold of the <code>IMPL_LOOKUP</code> instance, we have a fully privileged lookup instance, <br>
+     * but the classes that use this class do not account for aforementioned fact that teleporting the lookup with {@link java.lang.invoke.MethodHandles.Lookup#in(Class)} <br>
+     * still results in privilege loss.
+     * @implNote Initializing this class from outside of {@link UnsafeHelper} <b>will</b> result in an access violation due to incorrect classloading order
      */
     private static final class MethodHandleHelper {
-
         /**
          * Trusted lookup
          */
         private static final MethodHandles.Lookup LOOKUP;
 
         static {
+            // Don't allow initialization externally
+            final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$ModuleHelper");
+            try {
+                if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.ModuleHelper.class) {
+                    throw illegalCaller;
+                }
+            } catch (IllegalCallerException ice) {
+                illegalCaller.addSuppressed(ice);
+                throw illegalCaller;
+            }
+
+            try {
+                Class<?> callerClass = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
+            } catch (IllegalCallerException ice) {
+                ice.printStackTrace();
+            }
             LOOKUP = getTrustedLookup();
         }
 
@@ -492,7 +491,7 @@ public final class ReflectionUtils {
                     // If for some reason we couldn't get the trusted lookup via reflection, create a new trusted instance ourselves
 
                     // See MethodHandles.Lookup#TRUSTED
-                    final int trusted = -1;
+                    final int trustedMode = -1;
                     final long overrideOffset = UnsafeHelper.INTERNAL_UNSAFE.objectFieldOffset(AccessibleObject.class, "override");
 
                     if (overrideOffset == -1) {
@@ -502,13 +501,26 @@ public final class ReflectionUtils {
                     final Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
 
                     UnsafeHelper.unsafeSetAccesible(lookupConstructor, true);
-                    implLookup = lookupConstructor.newInstance(Object.class, null, trusted);
+                    implLookup = lookupConstructor.newInstance(Object.class, null, trustedMode);
                 }
             } catch (ReflectiveOperationException roe) {
                 throw new RuntimeException("Could not create trusted lookup!", roe);
             }
 
             return implLookup;
+        }
+
+        /**
+         * Private constructor to prevent instantiation.
+         */
+        private MethodHandleHelper() {
+            String callerBlame = "";
+            try {
+                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+            } catch (IllegalCallerException ignored) {
+
+            }
+            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.MethodHandleHelper.class) + callerBlame);
         }
     }
 
@@ -518,7 +530,7 @@ public final class ReflectionUtils {
      *
      * @author Lollopollqo
      */
-    static final class ModuleHelper {
+    private static final class ModuleHelper {
         /**
          * An instance of {@link ModuleLayer.Controller}, used to export / open packages without restrictions
          */
@@ -527,24 +539,152 @@ public final class ReflectionUtils {
          * The cached offset (in bytes) for the {@link ModuleLayer.Controller#layer} field in a {@link ModuleLayer.Controller} instance
          */
         private static final long layerFieldOffset;
+        /**
+         * Special module that represents all unnamed modules (see {@link Module#ALL_UNNAMED_MODULE}) <br>
+         * Cannot be final due to classloading ordering issues
+         */
+        private static Module allUnnamedModule;
+        /**
+         * Special module that represents all modules (see {@link Module#EVERYONE_MODULE}) <br>
+         * Cannot be final due to classloading ordering issues
+         */
+        private static Module everyoneModule;
 
         static {
+            // Don't allow initialization externally
+            final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$UnsafeHelper");
+            try {
+                if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != (UnsafeHelper.class)) {
+                    throw illegalCaller;
+                }
+            } catch (IllegalCallerException ice) {
+                illegalCaller.addSuppressed(ice);
+                throw illegalCaller;
+            }
+
             try {
                 layerController = (ModuleLayer.Controller) UnsafeHelper.UNSAFE.allocateInstance(ModuleLayer.Controller.class);
                 layerFieldOffset = UnsafeHelper.UNSAFE.objectFieldOffset(ModuleLayer.Controller.class.getDeclaredField("layer"));
-            } catch (ReflectiveOperationException roe) {
-                throw new RuntimeException(roe);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
             }
         }
 
+        /**
+         * Exports the specified package from the specified module to the specified module.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         * @param target      The module the package is to be exported to
+         */
         private static void addExports(Module source, String packageName, Module target) {
             UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
             layerController.addExports(source, packageName, target);
         }
 
+        /**
+         * Exports the specified package from the specified module to all the unnamed modules.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         */
+        private static void addExportsToAllUnnamed(Module source, String packageName) {
+            addExports(source, packageName, allUnnamedModule);
+        }
+
+        /**
+         * Exports the specified package from the specified module to all modules.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         */
+        private static void addExports(Module source, String packageName) {
+            addExports(source, packageName, everyoneModule);
+        }
+
+        /**
+         * Opens the specified package from the specified module to the specified module.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         * @param target      The module the package is to be opened to
+         */
         private static void addOpens(Module source, String packageName, Module target) {
             UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
             layerController.addOpens(source, packageName, target);
+        }
+
+        /**
+         * Opens the specified package from the specified module to all unnamed modules.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         */
+        private static void addOpensToAllUnnamed(Module source, String packageName) {
+            addOpens(source, packageName, allUnnamedModule);
+        }
+
+        /**
+         * Opens the specified package from the specified module to all modules.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         */
+        private static void addOpens(Module source, String packageName) {
+            addOpens(source, packageName, everyoneModule);
+        }
+
+        /**
+         * Sets the references to {@link Module#ALL_UNNAMED_MODULE} and {@link Module#EVERYONE_MODULE}.
+         *
+         * @see #allUnnamedModule
+         * @see #everyoneModule
+         */
+        private static void getSpecialModules() {
+            // Don't allow external invocations
+            final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#getSpecialModules() invoked from outside ReflectionUtils");
+            try {
+                if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.class) {
+                    throw illegalCaller;
+                }
+            } catch (IllegalCallerException ice) {
+                illegalCaller.addSuppressed(ice);
+                throw illegalCaller;
+            }
+
+            final boolean allUnnamedIsPresent = allUnnamedModule != null;
+            final boolean everyoneIsPresent = everyoneModule != null;
+
+            // If the references are already set, return early
+            if (allUnnamedIsPresent && everyoneIsPresent) {
+                return;
+            }
+
+            // If only one reference is not null it means something went really wrong, so throw an exception
+            if (allUnnamedIsPresent ^ everyoneIsPresent) {
+                throw new IllegalStateException("Expected both allUnnamedModule and everyoneModule to be non null, but only " + (allUnnamedIsPresent ? "everyoneModule" : "allUnnamedModule") + " is not null!");
+            }
+
+            // If both references are null, then we can proceed
+            try {
+                allUnnamedModule = (Module) MethodHandleHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "ALL_UNNAMED_MODULE", Module.class).invoke();
+                everyoneModule = (Module) MethodHandleHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "EVERYONE_MODULE", Module.class).invoke();
+            } catch (Throwable t) {
+                throw new RuntimeException("Could not find special module instances!", t);
+            }
+        }
+
+        /**
+         * Private constructor to prevent instantiation.
+         */
+        private ModuleHelper() {
+            String callerBlame = "";
+            try {
+                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+            } catch (IllegalCallerException ignored) {
+
+            }
+            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.ModuleHelper.class) + callerBlame);
         }
     }
 
@@ -554,7 +694,7 @@ public final class ReflectionUtils {
      *
      * @author Lollopollqo
      */
-    public static final class UnsafeHelper {
+    private static final class UnsafeHelper {
         /**
          * The {@link sun.misc.Unsafe} instance
          */
@@ -569,7 +709,19 @@ public final class ReflectionUtils {
         private static final long overrideOffset;
 
         static {
-            // Needs to be done before calling enableJdkInternalsAccess() as it uses the sun.misc.Unsafe instance
+            // Don't allow initialization externally
+            final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$UnsafeHelper#<clinit> invoked from outside ReflectionUtils");
+            try {
+                Class<?> caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
+                if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.class) {
+                    throw illegalCaller;
+                }
+            } catch (IllegalCallerException ice) {
+                illegalCaller.addSuppressed(ice);
+                throw illegalCaller;
+            }
+
+            // Needs to be done before calling enableJdkInternalsAccess() as it uses methods in ModuleHelper, which in turn uses the sun.misc.Unsafe instance
             UNSAFE = findUnsafe();
             enableJdkInternalsAccess();
             INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
@@ -629,13 +781,21 @@ public final class ReflectionUtils {
          * Export the {@link jdk.internal.misc} and {@link jdk.internal.access} packages to this class' module.
          */
         private static void enableJdkInternalsAccess() {
+            if (UNSAFE == null) {
+                throw new IllegalStateException(ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.UnsafeHelper.class) + "#enableJdkInternalsAccess() called before sun.misc.Unsafe instance could be obtained!");
+            }
+
             final String internalPackageName = "jdk.internal";
             final String miscPackageName = internalPackageName + ".misc";
             final String accessPackageName = internalPackageName + ".access";
             final String moduleName = "java.base";
-            final Module javaBaseModule = Object.class.getModule().getLayer().findModule(moduleName).orElseThrow(
-                    () -> new RuntimeException("Could not find module " + moduleName + "!")
-            );
+            final Module javaBaseModule = Object.class
+                                              .getModule()
+                                              .getLayer()
+                                              .findModule(moduleName)
+                                              .orElseThrow(
+                                                  () -> new RuntimeException("Could not find module " + moduleName + "!")
+                                              );
 
             ModuleHelper.addExports(javaBaseModule, miscPackageName, UnsafeHelper.class.getModule());
             ModuleHelper.addExports(javaBaseModule, accessPackageName, UnsafeHelper.class.getModule());
@@ -656,6 +816,19 @@ public final class ReflectionUtils {
             } catch (InstantiationException ie) {
                 throw new RuntimeException("Failed to allocate instance of " + getModuleInclusiveClassName(clazz), ie);
             }
+        }
+
+        /**
+         * Private constructor to prevent instantiation.
+         */
+        private UnsafeHelper() {
+            String callerBlame = "";
+            try {
+                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+            } catch (IllegalCallerException ignored) {
+
+            }
+            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.UnsafeHelper.class) + callerBlame);
         }
     }
 }
