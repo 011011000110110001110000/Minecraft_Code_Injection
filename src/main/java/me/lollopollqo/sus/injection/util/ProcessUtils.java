@@ -58,7 +58,7 @@ public final class ProcessUtils {
     @Nullable
     public static String mainClass(VirtualMachineDescriptor vm, boolean fullyQualified) {
         // This should return the result of sun.jvmstat.monitor.MonitoredVmUtil#commandLine(MonitoredVm)String if available
-        // We could also abuse compiler args to get access to the internal JDK modules and call the method ourselves, but it is unnecessary
+        // We could also abuse Unsafe and break the module system to get access to the internal JDK modules and call the method ourselves, but it is unnecessary
         String displayName = vm.displayName();
 
         // If the process ID and the display name are equal, it means something went wrong when trying to get the actual command line string, so return null
@@ -75,9 +75,9 @@ public final class ProcessUtils {
             return displayName;
         }
 
-        int lastSlash = displayName.lastIndexOf("/");
-        int lastBackslash = displayName.lastIndexOf("\\");
-        int lastSeparator = Math.max(lastSlash, lastBackslash);
+        final int lastSlash = displayName.lastIndexOf("/");
+        final int lastBackslash = displayName.lastIndexOf("\\");
+        final int lastSeparator = Math.max(lastSlash, lastBackslash);
 
         if (lastSeparator > 0) {
             displayName = displayName.substring(lastSeparator + 1);
@@ -85,7 +85,7 @@ public final class ProcessUtils {
 
         int lastPackageSeparator = displayName.lastIndexOf('.');
         if (lastPackageSeparator > 0) {
-            String lastPart = displayName.substring(lastPackageSeparator + 1);
+            final String lastPart = displayName.substring(lastPackageSeparator + 1);
 
             if (lastPart.equals("jar")) {
                 return displayName;
@@ -100,5 +100,13 @@ public final class ProcessUtils {
     /**
      * Private constructor to prevent instantiation.
      */
-    private ProcessUtils() {}
+    private ProcessUtils() {
+        String callerBlame = "";
+        try {
+            callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(StackWalker.getInstance().getCallerClass());
+        } catch (IllegalCallerException ignored) {
+
+        }
+        throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ProcessUtils.class) + callerBlame);
+    }
 }
