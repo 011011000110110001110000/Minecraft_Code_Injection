@@ -103,7 +103,7 @@ public final class ProcessUtils {
     private ProcessUtils() {
         String callerBlame = "";
         try {
-            callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(StackWalker.getInstance().getCallerClass());
+            callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
         } catch (IllegalCallerException ignored) {
 
         }
