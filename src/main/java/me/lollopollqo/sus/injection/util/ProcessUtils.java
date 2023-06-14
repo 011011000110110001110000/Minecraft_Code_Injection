@@ -16,6 +16,7 @@ public final class ProcessUtils {
      *
      * @param fullyQualifiedName the fully qualified name of the entrypoint class for the process
      * @return the Process ID of the desired process, or <code>-1</code> if the process could not be found
+     * @see #findProcessIdForClass(String, boolean)
      */
     public static long findProcessIdForClass(@NotNull String fullyQualifiedName) {
         return findProcessIdForClass(fullyQualifiedName, true);
