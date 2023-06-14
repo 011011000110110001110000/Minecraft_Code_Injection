@@ -83,7 +83,7 @@ public final class ProcessUtils {
             displayName = displayName.substring(lastSeparator + 1);
         }
 
-        int lastPackageSeparator = displayName.lastIndexOf('.');
+        final int lastPackageSeparator = displayName.lastIndexOf('.');
         if (lastPackageSeparator > 0) {
             final String lastPart = displayName.substring(lastPackageSeparator + 1);
 
