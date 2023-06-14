@@ -67,7 +67,7 @@ public final class ProcessUtils {
             return null;
         }
 
-        int firstSpace = displayName.indexOf(' ');
+        final int firstSpace = displayName.indexOf(' ');
         if (firstSpace > 0) {
             displayName = displayName.substring(0, firstSpace);
         }
