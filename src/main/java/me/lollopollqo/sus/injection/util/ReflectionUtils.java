@@ -460,21 +460,20 @@ public final class ReflectionUtils {
             // Don't allow initialization externally
             {
                 final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$ModuleHelper");
+                Class<?> caller;
+
                 try {
-                    if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.ModuleHelper.class) {
-                        throw illegalCaller;
-                    }
+                    caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
                 } catch (IllegalCallerException ice) {
                     illegalCaller.addSuppressed(ice);
                     throw illegalCaller;
                 }
+
+                if (caller != ReflectionUtils.ModuleHelper.class) {
+                    throw illegalCaller;
+                }
             }
 
-            try {
-                Class<?> callerClass = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
-            } catch (IllegalCallerException ice) {
-                ice.printStackTrace();
-            }
             LOOKUP = getTrustedLookup();
         }
 
@@ -558,12 +557,16 @@ public final class ReflectionUtils {
             // Don't allow initialization externally
             {
                 final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$UnsafeHelper");
+                final Class<?> caller;
+
                 try {
-                    if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != (UnsafeHelper.class)) {
-                        throw illegalCaller;
-                    }
+                    caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
                 } catch (IllegalCallerException ice) {
                     illegalCaller.addSuppressed(ice);
+                    throw illegalCaller;
+                }
+
+                if (caller != (UnsafeHelper.class)) {
                     throw illegalCaller;
                 }
             }
@@ -647,19 +650,6 @@ public final class ReflectionUtils {
          * @see #everyoneModule
          */
         private static void getSpecialModules() {
-            // Don't allow external invocations
-            {
-                final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#getSpecialModules() invoked from outside ReflectionUtils");
-                try {
-                    if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.class) {
-                        throw illegalCaller;
-                    }
-                } catch (IllegalCallerException ice) {
-                    illegalCaller.addSuppressed(ice);
-                    throw illegalCaller;
-                }
-            }
-
             final boolean allUnnamedIsPresent = allUnnamedModule != null;
             final boolean everyoneIsPresent = everyoneModule != null;
 
@@ -720,13 +710,16 @@ public final class ReflectionUtils {
             // Don't allow initialization externally
             {
                 final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$UnsafeHelper#<clinit> invoked from outside ReflectionUtils");
+                final Class<?> caller;
+
                 try {
-                    Class<?> caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
-                    if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.class) {
-                        throw illegalCaller;
-                    }
+                    caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
                 } catch (IllegalCallerException ice) {
                     illegalCaller.addSuppressed(ice);
+                    throw illegalCaller;
+                }
+
+                if (caller != ReflectionUtils.class) {
                     throw illegalCaller;
                 }
             }
