@@ -25,9 +25,8 @@ public final class ProcessUtils {
     /**
      * Determines the Process ID (PID) of the running Java process whose entrypoint class has the given name.
      *
-     * @param name the name of the entrypoint class for the process
+     * @param name           the name of the entrypoint class for the process
      * @param fullyQualified whether the provided name is fully qualified or just the simple name
-     *
      * @return the Process ID of the desired process, or <code>-1</code> if the process could not be found
      */
     public static long findProcessIdForClass(@NotNull String name, boolean fullyQualified) {
@@ -47,9 +46,8 @@ public final class ProcessUtils {
     /**
      * Obtains the name of the main class for the given virtual machine descriptor. <br>
      *
-     * @param vm the virtual machine descriptor
+     * @param vm             the virtual machine descriptor
      * @param fullyQualified whether to return the fully qualified name of the main class or just the simple name
-     *
      * @return the fully qualified name of the main class for the given virtual machine descriptor if <code>fullyQualified</code> is <code>true</code>,
      * the simple name if <code>fullyQualified</code> is <code>false</code>,
      * or <code>null</code> if the name could not be determined.
