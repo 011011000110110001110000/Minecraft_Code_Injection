@@ -6,7 +6,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * This class contains utility methods to gather information about running Java Virtual Machines.
+ * utility class that contains utility methods to gather information about running Java Virtual Machines.
  *
  * @author Lollopollqo
  */
