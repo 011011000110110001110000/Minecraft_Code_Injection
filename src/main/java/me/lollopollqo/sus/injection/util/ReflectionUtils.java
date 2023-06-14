@@ -441,12 +441,13 @@ public final class ReflectionUtils {
      * Helper class that makes working with {@link MethodHandle}s easier. <br>
      *
      * @author Lollopollqo
-     * @apiNote Due to the different implementation of {@link MethodHandles.Lookup}, this class is not compatible with <a href="https://www.eclipse.org/openj9/">OpenJ9</a> VMs. <br>
-     * This is due to the fact that in the OpenJ9 implementation access modes are different, <br>
+     * @apiNote Due to the different implementation of {@link MethodHandles.Lookup},
+     * this class is not compatible with <a href="https://www.eclipse.org/openj9/">OpenJ9</a> VMs. <br>
+     * This is due to the fact that, in the OpenJ9 implementation, access modes are different, <br>
      * and teleporting the lookup removes permissions even if the lookup object has full privileges. <br>
-     * Technically, if we manage to get hold of the <code>IMPL_LOOKUP</code> instance, we have a fully privileged lookup instance, <br>
-     * but the classes that use this class do not account for aforementioned fact that teleporting the lookup with {@link java.lang.invoke.MethodHandles.Lookup#in(Class)} <br>
-     * still results in privilege loss.
+     * Technically, if we manage to get hold of the <code>IMPL_LOOKUP</code> instance, we have a fully privileged lookup instance,
+     * but the methods that use this class do not account for the aforementioned fact that teleporting the lookup
+     * with {@link java.lang.invoke.MethodHandles.Lookup#in(Class)} still results in privilege loss.
      * @implNote Initializing this class from outside of {@link UnsafeHelper} <b>will</b> result in an access violation due to incorrect classloading order
      */
     private static final class MethodHandleHelper {
@@ -457,14 +458,16 @@ public final class ReflectionUtils {
 
         static {
             // Don't allow initialization externally
-            final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$ModuleHelper");
-            try {
-                if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.ModuleHelper.class) {
+            {
+                final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$ModuleHelper");
+                try {
+                    if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.ModuleHelper.class) {
+                        throw illegalCaller;
+                    }
+                } catch (IllegalCallerException ice) {
+                    illegalCaller.addSuppressed(ice);
                     throw illegalCaller;
                 }
-            } catch (IllegalCallerException ice) {
-                illegalCaller.addSuppressed(ice);
-                throw illegalCaller;
             }
 
             try {
@@ -553,14 +556,16 @@ public final class ReflectionUtils {
 
         static {
             // Don't allow initialization externally
-            final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$UnsafeHelper");
-            try {
-                if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != (UnsafeHelper.class)) {
+            {
+                final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$UnsafeHelper");
+                try {
+                    if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != (UnsafeHelper.class)) {
+                        throw illegalCaller;
+                    }
+                } catch (IllegalCallerException ice) {
+                    illegalCaller.addSuppressed(ice);
                     throw illegalCaller;
                 }
-            } catch (IllegalCallerException ice) {
-                illegalCaller.addSuppressed(ice);
-                throw illegalCaller;
             }
 
             try {
@@ -643,14 +648,16 @@ public final class ReflectionUtils {
          */
         private static void getSpecialModules() {
             // Don't allow external invocations
-            final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#getSpecialModules() invoked from outside ReflectionUtils");
-            try {
-                if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.class) {
+            {
+                final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#getSpecialModules() invoked from outside ReflectionUtils");
+                try {
+                    if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.class) {
+                        throw illegalCaller;
+                    }
+                } catch (IllegalCallerException ice) {
+                    illegalCaller.addSuppressed(ice);
                     throw illegalCaller;
                 }
-            } catch (IllegalCallerException ice) {
-                illegalCaller.addSuppressed(ice);
-                throw illegalCaller;
             }
 
             final boolean allUnnamedIsPresent = allUnnamedModule != null;
@@ -711,18 +718,20 @@ public final class ReflectionUtils {
 
         static {
             // Don't allow initialization externally
-            final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$UnsafeHelper#<clinit> invoked from outside ReflectionUtils");
-            try {
-                Class<?> caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
-                if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.class) {
+            {
+                final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$UnsafeHelper#<clinit> invoked from outside ReflectionUtils");
+                try {
+                    Class<?> caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
+                    if (StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass() != ReflectionUtils.class) {
+                        throw illegalCaller;
+                    }
+                } catch (IllegalCallerException ice) {
+                    illegalCaller.addSuppressed(ice);
                     throw illegalCaller;
                 }
-            } catch (IllegalCallerException ice) {
-                illegalCaller.addSuppressed(ice);
-                throw illegalCaller;
             }
 
-            // Needs to be done before calling enableJdkInternalsAccess() as it uses methods in ModuleHelper, which in turn uses the sun.misc.Unsafe instance
+            // Needs to be done before calling enableJdkInternalsAccess() as that uses methods in ModuleHelper, which in turn uses the sun.misc.Unsafe instance
             UNSAFE = findUnsafe();
             enableJdkInternalsAccess();
             INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
