@@ -11,12 +11,10 @@ import java.util.List;
 
 /**
  * <b>WIP</b> <br>
- * TODO: documentation, more helpers for internal methods, support for Openj9 VMs <br>
+ * TODO: documentation, more helpers for internal methods <br>
  * Utility class that contains some useful methods for easier / more powerful reflection usage. <br>
  *
  * @author Lollopollqo
- * @apiNote Due to the different implementation of {@link MethodHandles.Lookup}, this class is not compatible with <br>
- * <a href="https://www.eclipse.org/openj9/">OpenJ9</a> JDKs (see {@link LookupHelper}).
  */
 @SuppressWarnings("unused")
 public final class ReflectionUtils {
@@ -442,13 +440,6 @@ public final class ReflectionUtils {
      * Helper class that makes working with {@link MethodHandles.Lookup}s easier. <br>
      *
      * @author Lollopollqo
-     * @apiNote Due to the different implementation of {@link MethodHandles.Lookup},
-     * this class is not compatible with <a href="https://www.eclipse.org/openj9/">OpenJ9</a> JDKs. <br>
-     * This is due to the fact that, in the OpenJ9 implementation, access modes are different, <br>
-     * and teleporting the lookup removes permissions even if the lookup object has full privileges. <br>
-     * Technically, if we manage to get hold of the <code>IMPL_LOOKUP</code> instance, we have a fully privileged lookup instance,
-     * but the methods that use this class do not account for the aforementioned fact that teleporting the lookup
-     * with {@link java.lang.invoke.MethodHandles.Lookup#in(Class)} still results in privilege loss.
      * @implNote Initializing this class from outside of {@link UnsafeHelper} <b>will</b> result in an access violation due to incorrect classloading order
      */
     private static final class LookupHelper {
@@ -456,9 +447,6 @@ public final class ReflectionUtils {
          * Privileged lookup
          */
         private static final MethodHandles.Lookup LOOKUP;
-        private static final boolean openJ9JDK;
-        private static final long accessModeOffset;
-        private static final int INTERNAL_PRIVILEGED = 0x80;
 
         static {
             // Don't allow initialization externally
@@ -478,34 +466,7 @@ public final class ReflectionUtils {
                 }
             }
 
-
-            long tempAccessModeFieldOffset;
-            try {
-                tempAccessModeFieldOffset = UnsafeHelper.INTERNAL_UNSAFE.objectFieldOffset(MethodHandles.Lookup.class, "accessMode");
-            } catch (InternalError ie) {
-                // This means we are not in an OpenJ9 environment
-                tempAccessModeFieldOffset = -1;
-            }
-
-            accessModeOffset = tempAccessModeFieldOffset;
             LOOKUP = getPrivilegedLookup();
-
-            // Handle OpenJ9 JDKs
-            {
-                openJ9JDK = accessModeOffset != -1 && LOOKUP.lookupClass() == MethodHandle.class;
-
-                if (accessModeOffset != -1 && LOOKUP.lookupModes() != -1) {
-                    throw new IllegalStateException("Detected OpenJ9JDK but couldn't get privileged lookup via reflection!");
-                }
-            }
-        }
-
-        private static MethodHandles.Lookup privilegedLookupIn(Class<?> clazz) {
-            final MethodHandles.Lookup lookup = LOOKUP.in(clazz);
-            if (openJ9JDK) {
-                UnsafeHelper.INTERNAL_UNSAFE.putLong(lookup, accessModeOffset, LOOKUP.lookupModes());
-            }
-            return lookup;
         }
 
         /**
@@ -517,7 +478,7 @@ public final class ReflectionUtils {
             MethodHandles.Lookup implLookup;
             try {
                 try {
-                    // Get the trusted lookup via reflection
+                    // Get the privileged lookup via reflection
                     final Field implLookupField = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
                     UnsafeHelper.unsafeSetAccesible(implLookupField, true);
                     implLookup = (MethodHandles.Lookup) implLookupField.get(null);
@@ -525,16 +486,16 @@ public final class ReflectionUtils {
                 } catch (ReflectiveOperationException roe) {
                     // If for some reason we couldn't get the lookup via reflection, create a new instance ourselves
 
+                    // The access modes to use for the privileged lookup instance
                     // See MethodHandles.Lookup#TRUSTED
-                    final int trustedMode = -1;
-
+                    final int trusted = -1;
                     final Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
 
                     UnsafeHelper.unsafeSetAccesible(lookupConstructor, true);
-                    implLookup = lookupConstructor.newInstance(Object.class, null, trustedMode);
+                    implLookup = lookupConstructor.newInstance(Object.class, null, trusted);
                 }
             } catch (ReflectiveOperationException roe) {
-                throw new RuntimeException("Could not create trusted lookup!", roe);
+                throw new RuntimeException("Could not get privileged lookup!", roe);
             }
 
             return implLookup;
