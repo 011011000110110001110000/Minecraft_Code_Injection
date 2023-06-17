@@ -16,7 +16,7 @@ import java.util.List;
  *
  * @author Lollopollqo
  * @apiNote Due to the different implementation of {@link MethodHandles.Lookup}, this class is not compatible with <br>
- * <a href="https://www.eclipse.org/openj9/">OpenJ9</a> VMs (see {@link MethodHandleHelper}).
+ * <a href="https://www.eclipse.org/openj9/">OpenJ9</a> JDKs (see {@link LookupHelper}).
  */
 @SuppressWarnings("unused")
 public final class ReflectionUtils {
@@ -103,8 +103,9 @@ public final class ReflectionUtils {
      * Unlike {@link AccessibleObject#setAccessible(boolean)}, this method does not perform any permission checks.
      *
      * @param object     The object whose accessibility is to be forcefully set
-     * @param accessible the accessibility to be forcefully set
+     * @param accessible The accessibility to be forcefully set
      * @return <code>accessible</code>
+     * @see UnsafeHelper#unsafeSetAccesible(AccessibleObject, boolean)
      */
     @SuppressWarnings("UnusedReturnValue")
     public static boolean setAccessible(AccessibleObject object, boolean accessible) {
@@ -252,7 +253,7 @@ public final class ReflectionUtils {
      */
     public static Object invokeNonStatic(Object owner, String name, MethodType type, Object... arguments) {
         try {
-            return MethodHandleHelper.LOOKUP.bind(owner, name, type).invokeWithArguments(arguments);
+            return LookupHelper.LOOKUP.bind(owner, name, type).invokeWithArguments(arguments);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(owner.getClass()) + "." + name + type, e);
         }
@@ -275,7 +276,7 @@ public final class ReflectionUtils {
      * @see java.lang.invoke.MethodHandles.Lookup#findGetter(Class, String, Class)
      */
     public static MethodHandle findGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return MethodHandleHelper.LOOKUP.in(owner).findGetter(owner, name, type);
+        return LookupHelper.LOOKUP.in(owner).findGetter(owner, name, type);
     }
 
     /**
@@ -321,11 +322,11 @@ public final class ReflectionUtils {
      * @throws IllegalAccessException if access checking fails, or if the field is not {@code static}
      */
     public static MethodHandle findStaticGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return MethodHandleHelper.LOOKUP.in(owner).findStaticGetter(owner, name, type);
+        return LookupHelper.LOOKUP.in(owner).findStaticGetter(owner, name, type);
     }
 
     public static MethodHandle findSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return MethodHandleHelper.LOOKUP.in(owner).findSetter(owner, name, type);
+        return LookupHelper.LOOKUP.in(owner).findSetter(owner, name, type);
     }
 
     public static <O, T extends O> MethodHandle findSetterAndBind(Class<T> owner, O instance, String name, Class<?> type) throws ReflectiveOperationException {
@@ -333,7 +334,7 @@ public final class ReflectionUtils {
     }
 
     public static MethodHandle findStaticSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return MethodHandleHelper.LOOKUP.in(owner).findStaticSetter(owner, name, type);
+        return LookupHelper.LOOKUP.in(owner).findStaticSetter(owner, name, type);
     }
 
     /**
@@ -367,7 +368,7 @@ public final class ReflectionUtils {
     }
 
     public static MethodHandle findVirtual(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
-        return MethodHandleHelper.LOOKUP.in(owner).findVirtual(owner, name, type);
+        return LookupHelper.LOOKUP.in(owner).findVirtual(owner, name, type);
     }
 
     public static <O, T extends O> MethodHandle findVirtualAndBind(Class<T> owner, O instance, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
@@ -379,7 +380,7 @@ public final class ReflectionUtils {
     }
 
     public static MethodHandle findStatic(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
-        return MethodHandleHelper.LOOKUP.in(owner).findStatic(owner, name, MethodType.methodType(returnType, params));
+        return LookupHelper.LOOKUP.in(owner).findStatic(owner, name, MethodType.methodType(returnType, params));
     }
 
     /**
@@ -391,7 +392,7 @@ public final class ReflectionUtils {
     @NotNull
     public static <T> Class<T> ensureInitialized(@NotNull Class<T> clazz) {
         try {
-            MethodHandleHelper.LOOKUP.in(clazz).ensureInitialized(clazz);
+            LookupHelper.LOOKUP.in(clazz).ensureInitialized(clazz);
         } catch (IllegalAccessException e) {
             throw new RuntimeException("Failed to ensure " + getModuleInclusiveClassName(clazz) + " was initialized", e);
         }
@@ -438,11 +439,11 @@ public final class ReflectionUtils {
     }
 
     /**
-     * Helper class that makes working with {@link MethodHandle}s easier. <br>
+     * Helper class that makes working with {@link MethodHandles.Lookup}s easier. <br>
      *
      * @author Lollopollqo
      * @apiNote Due to the different implementation of {@link MethodHandles.Lookup},
-     * this class is not compatible with <a href="https://www.eclipse.org/openj9/">OpenJ9</a> VMs. <br>
+     * this class is not compatible with <a href="https://www.eclipse.org/openj9/">OpenJ9</a> JDKs. <br>
      * This is due to the fact that, in the OpenJ9 implementation, access modes are different, <br>
      * and teleporting the lookup removes permissions even if the lookup object has full privileges. <br>
      * Technically, if we manage to get hold of the <code>IMPL_LOOKUP</code> instance, we have a fully privileged lookup instance,
@@ -450,11 +451,14 @@ public final class ReflectionUtils {
      * with {@link java.lang.invoke.MethodHandles.Lookup#in(Class)} still results in privilege loss.
      * @implNote Initializing this class from outside of {@link UnsafeHelper} <b>will</b> result in an access violation due to incorrect classloading order
      */
-    private static final class MethodHandleHelper {
+    private static final class LookupHelper {
         /**
-         * Trusted lookup
+         * Privileged lookup
          */
         private static final MethodHandles.Lookup LOOKUP;
+        private static final boolean openJ9JDK;
+        private static final long accessModeOffset;
+        private static final int INTERNAL_PRIVILEGED = 0x80;
 
         static {
             // Don't allow initialization externally
@@ -474,15 +478,42 @@ public final class ReflectionUtils {
                 }
             }
 
-            LOOKUP = getTrustedLookup();
+
+            long tempAccessModeFieldOffset;
+            try {
+                tempAccessModeFieldOffset = UnsafeHelper.INTERNAL_UNSAFE.objectFieldOffset(MethodHandles.Lookup.class, "accessMode");
+            } catch (InternalError ie) {
+                // This means we are not in an OpenJ9 environment
+                tempAccessModeFieldOffset = -1;
+            }
+
+            accessModeOffset = tempAccessModeFieldOffset;
+            LOOKUP = getPrivilegedLookup();
+
+            // Handle OpenJ9 JDKs
+            {
+                openJ9JDK = accessModeOffset != -1 && LOOKUP.lookupClass() == MethodHandle.class;
+
+                if (accessModeOffset != -1 && LOOKUP.lookupModes() != -1) {
+                    throw new IllegalStateException("Detected OpenJ9JDK but couldn't get privileged lookup via reflection!");
+                }
+            }
+        }
+
+        private static MethodHandles.Lookup privilegedLookupIn(Class<?> clazz) {
+            final MethodHandles.Lookup lookup = LOOKUP.in(clazz);
+            if (openJ9JDK) {
+                UnsafeHelper.INTERNAL_UNSAFE.putLong(lookup, accessModeOffset, LOOKUP.lookupModes());
+            }
+            return lookup;
         }
 
         /**
-         * Gets or creates a {@link MethodHandles.Lookup} instance with <code>TRUSTED</code> access.
+         * Gets or creates a privileged {@link MethodHandles.Lookup} instance.
          *
          * @return the {@link MethodHandles.Lookup} instance
          */
-        private static MethodHandles.Lookup getTrustedLookup() {
+        private static MethodHandles.Lookup getPrivilegedLookup() {
             MethodHandles.Lookup implLookup;
             try {
                 try {
@@ -490,16 +521,12 @@ public final class ReflectionUtils {
                     final Field implLookupField = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
                     UnsafeHelper.unsafeSetAccesible(implLookupField, true);
                     implLookup = (MethodHandles.Lookup) implLookupField.get(null);
+
                 } catch (ReflectiveOperationException roe) {
-                    // If for some reason we couldn't get the trusted lookup via reflection, create a new trusted instance ourselves
+                    // If for some reason we couldn't get the lookup via reflection, create a new instance ourselves
 
                     // See MethodHandles.Lookup#TRUSTED
                     final int trustedMode = -1;
-                    final long overrideOffset = UnsafeHelper.INTERNAL_UNSAFE.objectFieldOffset(AccessibleObject.class, "override");
-
-                    if (overrideOffset == -1) {
-                        throw new RuntimeException("Could not locate AccessibleObject#override!");
-                    }
 
                     final Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
 
@@ -516,14 +543,14 @@ public final class ReflectionUtils {
         /**
          * Private constructor to prevent instantiation.
          */
-        private MethodHandleHelper() {
+        private LookupHelper() {
             String callerBlame = "";
             try {
                 callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
-            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.MethodHandleHelper.class) + callerBlame);
+            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(LookupHelper.class) + callerBlame);
         }
     }
 
@@ -544,12 +571,12 @@ public final class ReflectionUtils {
         private static final long layerFieldOffset;
         /**
          * Special module that represents all unnamed modules (see {@link Module#ALL_UNNAMED_MODULE}) <br>
-         * Cannot be final due to classloading ordering issues
+         * @implNote Cannot be final due to classloading ordering issues
          */
         private static Module allUnnamedModule;
         /**
          * Special module that represents all modules (see {@link Module#EVERYONE_MODULE}) <br>
-         * Cannot be final due to classloading ordering issues
+         * @implNote Cannot be final due to classloading ordering issues
          */
         private static Module everyoneModule;
 
@@ -665,8 +692,8 @@ public final class ReflectionUtils {
 
             // If both references are null, then we can proceed
             try {
-                allUnnamedModule = (Module) MethodHandleHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "ALL_UNNAMED_MODULE", Module.class).invoke();
-                everyoneModule = (Module) MethodHandleHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "EVERYONE_MODULE", Module.class).invoke();
+                allUnnamedModule = (Module) LookupHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "ALL_UNNAMED_MODULE", Module.class).invoke();
+                everyoneModule = (Module) LookupHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "EVERYONE_MODULE", Module.class).invoke();
             } catch (Throwable t) {
                 throw new RuntimeException("Could not find special module instances!", t);
             }
@@ -724,7 +751,7 @@ public final class ReflectionUtils {
                 }
             }
 
-            // Needs to be done before calling enableJdkInternalsAccess() as that uses methods in ModuleHelper, which in turn uses the sun.misc.Unsafe instance
+            // Needs to be done before calling enableJdkInternalsAccess() as that uses methods in ModuleHelper, which in turn use the sun.misc.Unsafe instance
             UNSAFE = findUnsafe();
             enableJdkInternalsAccess();
             INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
@@ -793,12 +820,12 @@ public final class ReflectionUtils {
             final String accessPackageName = internalPackageName + ".access";
             final String moduleName = "java.base";
             final Module javaBaseModule = Object.class
-                                              .getModule()
-                                              .getLayer()
-                                              .findModule(moduleName)
-                                              .orElseThrow(
-                                                  () -> new RuntimeException("Could not find module " + moduleName + "!")
-                                              );
+                    .getModule()
+                    .getLayer()
+                    .findModule(moduleName)
+                    .orElseThrow(
+                            () -> new RuntimeException("Could not find module " + moduleName + "!")
+                    );
 
             ModuleHelper.addExports(javaBaseModule, miscPackageName, UnsafeHelper.class.getModule());
             ModuleHelper.addExports(javaBaseModule, accessPackageName, UnsafeHelper.class.getModule());
