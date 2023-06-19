@@ -575,18 +575,17 @@ public final class ReflectionUtils {
          * @param target      The module the package is to be exported to
          */
         private static void addExports(Module source, String packageName, Module target) {
-            UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
-            layerController.addExports(source, packageName, target);
+            jdk.internal.access.SharedSecrets.getJavaLangAccess().addExports(source, packageName, target);
         }
 
         /**
-         * Exports the specified package from the specified module to all the unnamed modules.
+         * Exports the specified package from the specified module to all unnamed modules.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
          */
         private static void addExportsToAllUnnamed(Module source, String packageName) {
-            addExports(source, packageName, allUnnamedModule);
+            jdk.internal.access.SharedSecrets.getJavaLangAccess().addExportsToAllUnnamed(source, packageName);
         }
 
         /**
@@ -596,7 +595,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addExports(Module source, String packageName) {
-            addExports(source, packageName, everyoneModule);
+            jdk.internal.access.SharedSecrets.getJavaLangAccess().addExports(source, packageName);
         }
 
         /**
@@ -607,8 +606,7 @@ public final class ReflectionUtils {
          * @param target      The module the package is to be opened to
          */
         private static void addOpens(Module source, String packageName, Module target) {
-            UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
-            layerController.addOpens(source, packageName, target);
+            jdk.internal.access.SharedSecrets.getJavaLangAccess().addOpens(source, packageName, target);
         }
 
         /**
@@ -618,7 +616,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addOpensToAllUnnamed(Module source, String packageName) {
-            addOpens(source, packageName, allUnnamedModule);
+            jdk.internal.access.SharedSecrets.getJavaLangAccess().addOpensToAllUnnamed(source, packageName);
         }
 
         /**
@@ -626,9 +624,75 @@ public final class ReflectionUtils {
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
+         * @implNote Since {@link jdk.internal.access.JavaLangAccess} does not expose any methods to unconditionally open a module to all modules,
+         * we use the special {@link #everyoneModule} instance as if it was any other normal module
          */
         private static void addOpens(Module source, String packageName) {
-            addOpens(source, packageName, everyoneModule);
+            jdk.internal.access.SharedSecrets.getJavaLangAccess().addOpens(source, packageName, everyoneModule);
+        }
+
+        /**
+         * Exports the specified package from the specified module to the specified module using {@link jdk.internal.misc.Unsafe}.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         * @param target      The module the package is to be exported to
+         */
+        private static void unsafeAddExports(Module source, String packageName, Module target) {
+            UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
+            layerController.addExports(source, packageName, target);
+        }
+
+        /**
+         * Exports the specified package from the specified module to all unnamed modules using {@link jdk.internal.misc.Unsafe}.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         */
+        private static void unsafeAddExportsToAllUnnamed(Module source, String packageName) {
+            unsafeAddExports(source, packageName, allUnnamedModule);
+        }
+
+        /**
+         * Exports the specified package from the specified module to all modules using {@link jdk.internal.misc.Unsafe}.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         */
+        private static void unsafeAddExports(Module source, String packageName) {
+            unsafeAddExports(source, packageName, everyoneModule);
+        }
+
+        /**
+         * Opens the specified package from the specified module to the specified module using {@link jdk.internal.misc.Unsafe}.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         * @param target      The module the package is to be opened to
+         */
+        private static void unsafeAddOpens(Module source, String packageName, Module target) {
+            UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
+            layerController.addOpens(source, packageName, target);
+        }
+
+        /**
+         * Opens the specified package from the specified module to all unnamed modules using {@link jdk.internal.misc.Unsafe}.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         */
+        private static void unsafeAddOpensToAllUnnamed(Module source, String packageName) {
+            unsafeAddOpens(source, packageName, allUnnamedModule);
+        }
+
+        /**
+         * Opens the specified package from the specified module to all modules using {@link jdk.internal.misc.Unsafe}.
+         *
+         * @param source      The module the package belongs to
+         * @param packageName The name of the package
+         */
+        private static void unsafeAddOpens(Module source, String packageName) {
+            unsafeAddOpens(source, packageName, everyoneModule);
         }
 
         /**
@@ -788,8 +852,9 @@ public final class ReflectionUtils {
                             () -> new RuntimeException("Could not find module " + moduleName + "!")
                     );
 
-            ModuleHelper.addExports(javaBaseModule, miscPackageName, UnsafeHelper.class.getModule());
-            ModuleHelper.addExports(javaBaseModule, accessPackageName, UnsafeHelper.class.getModule());
+            // Need to use the unsafe version here as we obviously haven't gained access to the classes in the jdk.internal.access package (SharedSecrets, JavaLangAccess)
+            ModuleHelper.unsafeAddExports(javaBaseModule, miscPackageName, UnsafeHelper.class.getModule());
+            ModuleHelper.unsafeAddExports(javaBaseModule, accessPackageName, UnsafeHelper.class.getModule());
         }
 
         /**
