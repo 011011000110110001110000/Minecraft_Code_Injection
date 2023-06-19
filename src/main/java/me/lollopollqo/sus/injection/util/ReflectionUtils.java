@@ -444,7 +444,7 @@ public final class ReflectionUtils {
      */
     private static final class LookupHelper {
         /**
-         * Privileged lookup
+         * Trusted lookup
          */
         private static final MethodHandles.Lookup LOOKUP;
 
@@ -466,19 +466,19 @@ public final class ReflectionUtils {
                 }
             }
 
-            LOOKUP = getPrivilegedLookup();
+            LOOKUP = getTrustedLookup();
         }
 
         /**
-         * Gets or creates a privileged {@link MethodHandles.Lookup} instance.
+         * Gets or creates a trusted {@link MethodHandles.Lookup} instance.
          *
          * @return the {@link MethodHandles.Lookup} instance
          */
-        private static MethodHandles.Lookup getPrivilegedLookup() {
+        private static MethodHandles.Lookup getTrustedLookup() {
             MethodHandles.Lookup implLookup;
             try {
                 try {
-                    // Get the privileged lookup via reflection
+                    // Get the trusted lookup via reflection
                     final Field implLookupField = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
                     UnsafeHelper.unsafeSetAccesible(implLookupField, true);
                     implLookup = (MethodHandles.Lookup) implLookupField.get(null);
@@ -486,7 +486,7 @@ public final class ReflectionUtils {
                 } catch (ReflectiveOperationException roe) {
                     // If for some reason we couldn't get the lookup via reflection, create a new instance ourselves
 
-                    // The access modes to use for the privileged lookup instance
+                    // The access modes to use for the trusted lookup instance
                     // See MethodHandles.Lookup#TRUSTED
                     final int trusted = -1;
                     final Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
