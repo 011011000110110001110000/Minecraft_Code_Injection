@@ -628,7 +628,7 @@ public final class ReflectionUtils {
          * we use the special {@link #everyoneModule} instance as if it was any other normal module
          */
         private static void addOpens(Module source, String packageName) {
-            jdk.internal.access.SharedSecrets.getJavaLangAccess().addOpens(source, packageName, everyoneModule);
+            addOpens(source, packageName, everyoneModule);
         }
 
         /**
