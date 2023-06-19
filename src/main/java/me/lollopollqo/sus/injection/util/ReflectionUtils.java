@@ -624,7 +624,7 @@ public final class ReflectionUtils {
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
-         * @implNote Since {@link jdk.internal.access.JavaLangAccess} does not expose any methods to unconditionally open a module to all modules,
+         * @implNote Since {@link jdk.internal.access.JavaLangAccess} does not expose any methods to unconditionally open a package to all modules,
          * we use the special {@link #everyoneModule} instance as if it was any other normal module
          */
         private static void addOpens(Module source, String packageName) {
