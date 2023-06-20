@@ -524,10 +524,24 @@ public final class ReflectionUtils {
     private static final class ModuleHelper {
         /**
          * An instance of {@link ModuleLayer.Controller}, used to export / open packages without restrictions
+         *
+         * @see #unsafeAddExports(Module, String, Module)
+         * @see #unsafeAddExportsToAllUnnamed(Module, String)
+         * @see #unsafeAddExports(Module, String)
+         * @see #unsafeAddOpens(Module, String, Module)
+         * @see #unsafeAddOpensToAllUnnamed(Module, String)
+         * @see #unsafeAddOpens(Module, String)
          */
         private static final ModuleLayer.Controller layerController;
         /**
          * The cached offset (in bytes) for the {@link ModuleLayer.Controller#layer} field in a {@link ModuleLayer.Controller} instance
+         *
+         * @see #unsafeAddExports(Module, String, Module)
+         * @see #unsafeAddExportsToAllUnnamed(Module, String)
+         * @see #unsafeAddExports(Module, String)
+         * @see #unsafeAddOpens(Module, String, Module)
+         * @see #unsafeAddOpensToAllUnnamed(Module, String)
+         * @see #unsafeAddOpens(Module, String)
          */
         private static final long layerFieldOffset;
         /**
