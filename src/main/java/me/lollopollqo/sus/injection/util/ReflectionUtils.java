@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * <b>WIP</b> <br>
- * TODO: documentation, more helpers for internal methods <br>
+ * TODO: documentation, more helpers for internal methods, helper class for method handles, helper class for var handles? <br>
  * Utility class that contains some useful methods for easier / more powerful reflection usage. <br>
  *
  * @author Lollopollqo
