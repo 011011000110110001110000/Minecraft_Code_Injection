@@ -237,7 +237,7 @@ public final class ReflectionUtils {
      */
     @SuppressWarnings("unchecked")
     public static <T> T invokeNonStatic(Object owner, String name, Class<T> returnType, Class<?>[] argumentTypes, Object... arguments) {
-        return (T) invokeNonStatic(owner, name, MethodType.methodType(returnType, argumentTypes));
+        return (T) invokeNonStatic(owner, name, MethodType.methodType(returnType, argumentTypes), arguments);
     }
 
     /**
@@ -532,11 +532,13 @@ public final class ReflectionUtils {
         private static final long layerFieldOffset;
         /**
          * Special module that represents all unnamed modules (see {@link Module#ALL_UNNAMED_MODULE}) <br>
+         *
          * @implNote Cannot be final due to classloading ordering issues
          */
         private static Module allUnnamedModule;
         /**
          * Special module that represents all modules (see {@link Module#EVERYONE_MODULE}) <br>
+         *
          * @implNote Cannot be final due to classloading ordering issues
          */
         private static Module everyoneModule;
