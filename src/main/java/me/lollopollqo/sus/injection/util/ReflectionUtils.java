@@ -868,7 +868,7 @@ public final class ReflectionUtils {
                             () -> new RuntimeException("Could not find module " + moduleName + "!")
                     );
 
-            // Need to use the unsafe version here as we obviously haven't gained access to the classes in the jdk.internal.access package (SharedSecrets, JavaLangAccess)
+            // Need to use the unsafe version here as we obviously haven't gained access to the classes in the jdk.internal.access package (SharedSecrets, JavaLangAccess) yet
             ModuleHelper.unsafeAddExports(javaBaseModule, miscPackageName, UnsafeHelper.class.getModule());
             ModuleHelper.unsafeAddExports(javaBaseModule, accessPackageName, UnsafeHelper.class.getModule());
         }
