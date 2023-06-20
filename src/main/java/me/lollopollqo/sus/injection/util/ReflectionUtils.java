@@ -849,7 +849,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Export the {@link jdk.internal.misc} and {@link jdk.internal.access} packages to this class' module.
+         * Export the {@link jdk.internal.misc}, {@link jdk.internal.access} and {@link jdk.internal.reflect} packages to this class' module.
          */
         private static void enableJdkInternalsAccess() {
             if (UNSAFE == null) {
@@ -859,6 +859,7 @@ public final class ReflectionUtils {
             final String internalPackageName = "jdk.internal";
             final String miscPackageName = internalPackageName + ".misc";
             final String accessPackageName = internalPackageName + ".access";
+            final String reflectPackageName = internalPackageName + ".reflect";
             final String moduleName = "java.base";
             final Module javaBaseModule = Object.class
                     .getModule()
@@ -871,6 +872,7 @@ public final class ReflectionUtils {
             // Need to use the unsafe version here as we obviously haven't gained access to the classes in the jdk.internal.access package (SharedSecrets, JavaLangAccess) yet
             ModuleHelper.unsafeAddExports(javaBaseModule, miscPackageName, UnsafeHelper.class.getModule());
             ModuleHelper.unsafeAddExports(javaBaseModule, accessPackageName, UnsafeHelper.class.getModule());
+            ModuleHelper.unsafeAddExports(javaBaseModule, reflectPackageName, UnsafeHelper.class.getModule());
         }
 
         /**
