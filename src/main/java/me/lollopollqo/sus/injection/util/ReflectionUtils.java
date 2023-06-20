@@ -437,7 +437,7 @@ public final class ReflectionUtils {
     }
 
     /**
-     * Helper class that makes working with {@link MethodHandles.Lookup}s easier. <br>
+     * Helper class that holds a trusted {@link MethodHandles.Lookup} instance. <br>
      *
      * @author Lollopollqo
      * @implNote Initializing this class from outside of {@link UnsafeHelper} <b>will</b> result in an access violation due to incorrect classloading order
@@ -495,7 +495,7 @@ public final class ReflectionUtils {
                     implLookup = lookupConstructor.newInstance(Object.class, null, trusted);
                 }
             } catch (ReflectiveOperationException roe) {
-                throw new RuntimeException("Could not get privileged lookup!", roe);
+                throw new RuntimeException("Could not get trusted lookup!", roe);
             }
 
             return implLookup;
