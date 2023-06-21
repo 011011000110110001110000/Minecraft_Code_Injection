@@ -649,7 +649,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Exports the specified package from the specified module to the specified module using {@link jdk.internal.misc.Unsafe}.
+         * Exports the specified package from the specified module to the specified module using {@link sun.misc.Unsafe}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
@@ -661,7 +661,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Exports the specified package from the specified module to all unnamed modules using {@link jdk.internal.misc.Unsafe}.
+         * Exports the specified package from the specified module to all unnamed modules using {@link sun.misc.Unsafe}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
@@ -671,7 +671,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Exports the specified package from the specified module to all modules using {@link jdk.internal.misc.Unsafe}.
+         * Exports the specified package from the specified module to all modules using {@link sun.misc.Unsafe}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
@@ -681,7 +681,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Opens the specified package from the specified module to the specified module using {@link jdk.internal.misc.Unsafe}.
+         * Opens the specified package from the specified module to the specified module using {@link sun.misc.Unsafe}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
@@ -693,7 +693,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Opens the specified package from the specified module to all unnamed modules using {@link jdk.internal.misc.Unsafe}.
+         * Opens the specified package from the specified module to all unnamed modules using {@link sun.misc.Unsafe}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
@@ -703,7 +703,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Opens the specified package from the specified module to all modules using {@link jdk.internal.misc.Unsafe}.
+         * Opens the specified package from the specified module to all modules using {@link sun.misc.Unsafe}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
