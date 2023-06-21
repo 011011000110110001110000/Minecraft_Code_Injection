@@ -571,7 +571,7 @@ public final class ReflectionUtils {
                     throw illegalCaller;
                 }
 
-                if (caller != (UnsafeHelper.class)) {
+                if (caller != UnsafeHelper.class) {
                     throw illegalCaller;
                 }
             }
