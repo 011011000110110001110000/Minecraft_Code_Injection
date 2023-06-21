@@ -536,6 +536,7 @@ public final class ReflectionUtils {
         /**
          * The cached offset (in bytes) for the {@link ModuleLayer.Controller#layer} field in a {@link ModuleLayer.Controller} instance
          *
+         * @see #layerController
          * @see #unsafeAddExports(Module, String, Module)
          * @see #unsafeAddExportsToAllUnnamed(Module, String)
          * @see #unsafeAddExports(Module, String)
@@ -876,10 +877,11 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Allocates a new instance of the given class, throwing a {@link RuntimeException} if an {@link InstantiationException} occurs.
+         * Allocates a new instance of the given class without doing any initialization.
          *
          * @param clazz The class a new instance of which is to be created
          * @return the allocated instance
+         * @throws RuntimeException if an {@link InstantiationException} occurs
          * @see jdk.internal.misc.Unsafe#allocateInstance(Class)
          */
         @SuppressWarnings("unchecked")
