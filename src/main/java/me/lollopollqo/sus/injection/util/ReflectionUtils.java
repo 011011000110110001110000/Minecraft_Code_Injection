@@ -522,7 +522,7 @@ public final class ReflectionUtils {
      * @author Lollopollqo
      */
     private static final class MethodHandleHelper {
-
+        // TODO: Bridges for findSpecial and findConstructor, documentation
         /**
          * Produces a method handle giving read access to a non-static field.
          * The type of the method handle will have a return type of the field's
