@@ -362,8 +362,8 @@ public final class ReflectionUtils {
         return (Class<T>) loader.loadClass(name);
     }
 
-    public static MethodHandle findVirtual(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
-        return findVirtual(owner, name, MethodType.methodType(returnType, params));
+    public static MethodHandle findVirtual(Class<?> owner, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
+        return findVirtual(owner, name, MethodType.methodType(returnType, parameterTypes));
     }
 
     public static MethodHandle findVirtual(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
@@ -559,15 +559,121 @@ public final class ReflectionUtils {
          * @return a method handle which can load values from the field
          * @throws NoSuchFieldException   if the field does not exist
          * @throws IllegalAccessException if access checking fails, or if the field is not {@code static}
+         * @see MethodHandles.Lookup#findStaticGetter(Class, String, Class)
          */
         public static MethodHandle findStaticGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
             return LookupHelper.LOOKUP.in(owner).findStaticGetter(owner, name, type);
         }
 
-        private static MethodHandle findVirtual(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
-            return findVirtual(owner, name, MethodType.methodType(returnType, params));
+        /**
+         * Produces a method handle for a virtual method.
+         * The type of the method handle will be that of the method,
+         * with the receiver type (usually {@code refc}) prepended.
+         * The method and all its argument types must be accessible to the lookup object.
+         * <p>
+         * When called, the handle will treat the first argument as a receiver
+         * and, for non-private methods, dispatch on the receiver's type to determine which method
+         * implementation to enter.
+         * For private methods the named method in {@code refc} will be invoked on the receiver.
+         * (The dispatching action is identical with that performed by an
+         * {@code invokevirtual} or {@code invokeinterface} instruction.)
+         * <p>
+         * The first argument will be of type {@code refc} if the lookup
+         * class has full privileges to access the member.  Otherwise
+         * the member must be {@code protected} and the first argument
+         * will be restricted in type to the lookup class.
+         * <p>
+         * The returned method handle will have
+         * {@linkplain MethodHandle#asVarargsCollector variable arity} if and only if
+         * the method's variable arity modifier bit ({@code 0x0080}) is set.
+         * <p>
+         * Because of the general <a href="MethodHandles.Lookup.html#equiv">equivalence</a> between {@code invokevirtual}
+         * instructions and method handles produced by {@code findVirtual},
+         * if the class is {@code MethodHandle} and the name string is
+         * {@code invokeExact} or {@code invoke}, the resulting
+         * method handle is equivalent to one produced by
+         * {@link java.lang.invoke.MethodHandles#exactInvoker MethodHandles.exactInvoker} or
+         * {@link java.lang.invoke.MethodHandles#invoker MethodHandles.invoker}
+         * with the same {@code type} argument.
+         * <p>
+         * If the class is {@code VarHandle} and the name string corresponds to
+         * the name of a signature-polymorphic access mode method, the resulting
+         * method handle is equivalent to one produced by
+         * {@link java.lang.invoke.MethodHandles#varHandleInvoker} with
+         * the access mode corresponding to the name string and with the same
+         * {@code type} arguments.
+         *
+         * @param owner          The class or interface from which the method is accessed
+         * @param name           The name of the method
+         * @param returnType     The return type of the method
+         * @param parameterTypes The types of the parameters the method accepts, in order
+         * @return the desired method handle
+         * @throws NoSuchMethodException  if the method does not exist
+         * @throws IllegalAccessException if access checking fails,
+         *                                or if the method is {@code static},
+         *                                or if the method's variable arity modifier bit
+         *                                is set and {@code asVarargsCollector} fails
+         * @throws SecurityException      if a security manager is present and it
+         *                                <a href="MethodHandles.Lookup.html#secmgr">refuses access</a>
+         * @throws NullPointerException   if any argument is null
+         * @see #findVirtual(Class, String, MethodType)
+         */
+        private static MethodHandle findVirtual(Class<?> owner, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
+            return findVirtual(owner, name, MethodType.methodType(returnType, parameterTypes));
         }
 
+        /**
+         * Produces a method handle for a virtual method.
+         * The type of the method handle will be that of the method,
+         * with the receiver type (usually {@code refc}) prepended.
+         * The method and all its argument types must be accessible to the lookup object.
+         * <p>
+         * When called, the handle will treat the first argument as a receiver
+         * and, for non-private methods, dispatch on the receiver's type to determine which method
+         * implementation to enter.
+         * For private methods the named method in {@code refc} will be invoked on the receiver.
+         * (The dispatching action is identical with that performed by an
+         * {@code invokevirtual} or {@code invokeinterface} instruction.)
+         * <p>
+         * The first argument will be of type {@code refc} if the lookup
+         * class has full privileges to access the member.  Otherwise
+         * the member must be {@code protected} and the first argument
+         * will be restricted in type to the lookup class.
+         * <p>
+         * The returned method handle will have
+         * {@linkplain MethodHandle#asVarargsCollector variable arity} if and only if
+         * the method's variable arity modifier bit ({@code 0x0080}) is set.
+         * <p>
+         * Because of the general <a href="MethodHandles.Lookup.html#equiv">equivalence</a> between {@code invokevirtual}
+         * instructions and method handles produced by {@code findVirtual},
+         * if the class is {@code MethodHandle} and the name string is
+         * {@code invokeExact} or {@code invoke}, the resulting
+         * method handle is equivalent to one produced by
+         * {@link java.lang.invoke.MethodHandles#exactInvoker MethodHandles.exactInvoker} or
+         * {@link java.lang.invoke.MethodHandles#invoker MethodHandles.invoker}
+         * with the same {@code type} argument.
+         * <p>
+         * If the class is {@code VarHandle} and the name string corresponds to
+         * the name of a signature-polymorphic access mode method, the resulting
+         * method handle is equivalent to one produced by
+         * {@link java.lang.invoke.MethodHandles#varHandleInvoker} with
+         * the access mode corresponding to the name string and with the same
+         * {@code type} arguments.
+         *
+         * @param owner The class or interface from which the method is accessed
+         * @param name  The name of the method
+         * @param type  The type of the method, with the receiver argument omitted
+         * @return the desired method handle
+         * @throws NoSuchMethodException  if the method does not exist
+         * @throws IllegalAccessException if access checking fails,
+         *                                or if the method is {@code static},
+         *                                or if the method's variable arity modifier bit
+         *                                is set and {@code asVarargsCollector} fails
+         * @throws SecurityException      if a security manager is present and it
+         *                                <a href="MethodHandles.Lookup.html#secmgr">refuses access</a>
+         * @throws NullPointerException   if any argument is null
+         * @see java.lang.invoke.MethodHandles.Lookup#findVirtual(Class, String, MethodType)
+         */
         private static MethodHandle findVirtual(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
             return LookupHelper.LOOKUP.in(owner).findVirtual(owner, name, type);
         }
