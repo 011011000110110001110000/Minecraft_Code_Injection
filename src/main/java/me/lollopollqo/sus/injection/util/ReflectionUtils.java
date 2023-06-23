@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.*;
 import java.util.ArrayList;
@@ -512,6 +513,104 @@ public final class ReflectionUtils {
 
             }
             throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(LookupHelper.class) + callerBlame);
+        }
+    }
+
+    /**
+     * Helper class that makes working with {@link MethodHandle}s easier.
+     *
+     * @author Lollopollqo
+     */
+    private static final class MethodHandleHelper {
+
+        /**
+         * Produces a method handle giving read access to a non-static field.
+         * The type of the method handle will have a return type of the field's
+         * value type.
+         * The method handle's single argument will be the instance containing
+         * the field.
+         * Access checking is performed immediately on behalf of the lookup class.
+         *
+         * @param owner The class or interface from which the method is accessed
+         * @param name  The field's name
+         * @param type  The field's type
+         * @return a method handle which can load values from the field
+         * @throws NoSuchFieldException   if the field does not exist
+         * @throws IllegalAccessException if access checking fails, or if the field is {@code static}
+         * @see java.lang.invoke.MethodHandles.Lookup#findGetter(Class, String, Class)
+         */
+        public static MethodHandle findGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(owner).findGetter(owner, name, type);
+        }
+
+        /**
+         * Produces a method handle giving read access to a static field. <br>
+         * The type of the method handle will have a return type of the field's
+         * value type. <br>
+         * The method handle will take no arguments. <br>
+         * Access checking is performed immediately on behalf of the lookup class. <br>
+         * <br>
+         * If the returned method handle is invoked, the field's class will
+         * be initialized, if it has not already been initialized. <br>
+         *
+         * @param owner The class or interface from which the method is accessed
+         * @param name  The field's name
+         * @param type  The field's type
+         * @return a method handle which can load values from the field
+         * @throws NoSuchFieldException   if the field does not exist
+         * @throws IllegalAccessException if access checking fails, or if the field is not {@code static}
+         */
+        public static MethodHandle findStaticGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(owner).findStaticGetter(owner, name, type);
+        }
+
+        private static MethodHandle findVirtual(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
+            return findVirtual(owner, name, MethodType.methodType(returnType, params));
+        }
+
+        private static MethodHandle findVirtual(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(owner).findVirtual(owner, name, type);
+        }
+
+        private static MethodHandle findStatic(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
+            return findStatic(owner, name, MethodType.methodType(returnType, params));
+        }
+
+        private static MethodHandle findStatic(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(owner).findStatic(owner, name, type);
+        }
+
+        /**
+         * Private constructor to prevent instantiation.
+         */
+        private MethodHandleHelper() {
+            String callerBlame = "";
+            try {
+                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+            } catch (IllegalCallerException ignored) {
+
+            }
+            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.MethodHandleHelper.class) + callerBlame);
+        }
+    }
+
+    /**
+     * Helper class that makes working with {@link VarHandle}s easier.
+     *
+     * @author Lollopollqo
+     */
+    private static final class VarHandleHelper {
+        /**
+         * Private constructor to prevent instantiation.
+         */
+        private VarHandleHelper() {
+            String callerBlame = "";
+            try {
+                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+            } catch (IllegalCallerException ignored) {
+
+            }
+            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.VarHandleHelper.class) + callerBlame);
         }
     }
 
