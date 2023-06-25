@@ -4,18 +4,18 @@ import org.jetbrains.annotations.NotNull;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.lang.invoke.MethodType;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * <b>WIP</b> <br>
- * TODO: documentation, more helpers for internal methods, helper class for method handles, helper class for var handles? <br>
+ * TODO: documentation, more helpers for internal methods <br>
  * Utility class that contains some useful methods for easier / more powerful reflection usage. <br>
  *
- * @author Lollopollqo
+ * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
  */
 @SuppressWarnings("unused")
 public final class ReflectionUtils {
@@ -34,23 +34,23 @@ public final class ReflectionUtils {
     /**
      * Gets a method by name and forces it to be accessible.
      *
-     * @param owner      The class that declares the method
+     * @param owner      The class or interface from which the method is accessed
      * @param name       The name of the method
      * @param paramTypes The types of the parameters of the method, in order
      * @return the method with the specified owner, name and parameter types
      * @throws NoSuchMethodException if a field with the specified name and parameter types could not be found in the specified class
-     * @implNote This method still has the same restrictions as {@link Class#getDeclaredField(String)} in regard to what methods it can find (see {@link jdk.internal.reflect.Reflection#registerMethodsToFilter}).
+     * @implNote This method still has the same restrictions as {@link Class#getDeclaredMethod(String, Class[])} in regard to what methods it can find (see {@link jdk.internal.reflect.Reflection#registerMethodsToFilter}).
      */
     public static Method forceGetDeclaredMethod(Class<?> owner, String name, Class<?>... paramTypes) throws NoSuchMethodException {
         Method method = owner.getDeclaredMethod(name, paramTypes);
-        forceSetAccessible(method, true);
+        forceSetAccessibleWithUnsafe(method, true);
         return method;
     }
 
     /**
      * Gets a field by name and forces it to be accessible.
      *
-     * @param owner The class that declares the field
+     * @param owner The class or interface from which the field is accessed
      * @param name  The name of the field
      * @return the field with the specified owner and name
      * @throws NoSuchFieldException if a field with the specified name could not be found in the specified class
@@ -58,7 +58,7 @@ public final class ReflectionUtils {
      */
     public static Field forceGetDeclaredField(Class<?> owner, String name) throws NoSuchFieldException {
         Field field = owner.getDeclaredField(name);
-        forceSetAccessible(field, true);
+        forceSetAccessibleWithUnsafe(field, true);
         return field;
     }
 
@@ -69,7 +69,7 @@ public final class ReflectionUtils {
      * then this method will return the first field with the specified modifiers and type it can find in the target class. <br>
      * The order in which fields are checked is determined by {@link Class#getDeclaredFields()}.
      *
-     * @param owner     The class that declares the field
+     * @param owner     The class or interface from which the field is accessed
      * @param modifiers The access modifiers of the field
      * @param type      The type of the field
      * @return the field with the specified owner, access modifiers and type
@@ -79,7 +79,7 @@ public final class ReflectionUtils {
     public static Field forceGetDeclaredField(Class<?> owner, int modifiers, Class<?> type) throws NoSuchFieldException {
         for (Field field : owner.getDeclaredFields()) {
             if (field.getModifiers() == modifiers && field.getType() == type) {
-                forceSetAccessible(field, true);
+                forceSetAccessibleWithUnsafe(field, true);
                 return field;
             }
         }
@@ -93,8 +93,8 @@ public final class ReflectionUtils {
      * @param accessible The accessibility to be forcefully set
      */
     @SuppressWarnings("SameParameterValue")
-    private static void forceSetAccessible(AccessibleObject object, boolean accessible) {
-        setAccessible(object, accessible);
+    private static void forceSetAccessibleWithUnsafe(AccessibleObject object, boolean accessible) {
+        unsafeSetAccessible(object, accessible);
     }
 
     /**
@@ -107,7 +107,7 @@ public final class ReflectionUtils {
      * @see UnsafeHelper#unsafeSetAccesible(AccessibleObject, boolean)
      */
     @SuppressWarnings("UnusedReturnValue")
-    public static boolean setAccessible(AccessibleObject object, boolean accessible) {
+    public static boolean unsafeSetAccessible(AccessibleObject object, boolean accessible) {
         try {
             UnsafeHelper.unsafeSetAccesible(object, accessible);
             return accessible;
@@ -128,7 +128,7 @@ public final class ReflectionUtils {
         try {
             ModuleHelper.addExports(source, packageName, target);
         } catch (Throwable t) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to module " + target.getName() + "!", t);
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to module " + target.getName(), t);
         }
     }
 
@@ -143,7 +143,7 @@ public final class ReflectionUtils {
         try {
             ModuleHelper.addExportsToAllUnnamed(source, packageName);
         } catch (Throwable t) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules!", t);
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all unnamed modules", t);
         }
     }
 
@@ -158,7 +158,7 @@ public final class ReflectionUtils {
         try {
             ModuleHelper.addExports(source, packageName);
         } catch (Throwable t) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules!", t);
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules", t);
         }
     }
 
@@ -174,7 +174,7 @@ public final class ReflectionUtils {
         try {
             ModuleHelper.addOpens(source, packageName, target);
         } catch (Throwable t) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to module " + target.getName() + "!", t);
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to module " + target.getName(), t);
         }
     }
 
@@ -189,7 +189,7 @@ public final class ReflectionUtils {
         try {
             ModuleHelper.addOpensToAllUnnamed(source, packageName);
         } catch (Throwable t) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules!", t);
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all unnamed modules", t);
         }
     }
 
@@ -204,7 +204,7 @@ public final class ReflectionUtils {
         try {
             ModuleHelper.addOpens(source, packageName);
         } catch (Throwable t) {
-            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules!", t);
+            throw new RuntimeException("Could not export package " + packageName + " from module " + source.getName() + " to all modules", t);
         }
     }
 
@@ -212,7 +212,7 @@ public final class ReflectionUtils {
      * Gets the value of the field with the specified name and type in the specified class. <br>
      * This method bypasses any limitations that {@link Class#getDeclaredField(String)} has (see {@link jdk.internal.reflect.Reflection#registerFieldsToFilter}).
      *
-     * @param owner The class that declares the field
+     * @param owner The class or interface from which the field is accessed
      * @param name  The name of the field
      * @param type  The type of the field
      * @return the value of the field
@@ -235,6 +235,7 @@ public final class ReflectionUtils {
      * @param argumentTypes The argument types of the method
      * @param arguments     The arguments to use when invoking the method
      * @return the value returned by the method, cast to the appropriate type
+     * @see #invokeNonStatic(Object, String, MethodType, Object...)
      */
     @SuppressWarnings("unchecked")
     public static <T> T invokeNonStatic(Object owner, String name, Class<T> returnType, Class<?>[] argumentTypes, Object... arguments) {
@@ -272,10 +273,10 @@ public final class ReflectionUtils {
      * @return a method handle which can load values from the field
      * @throws NoSuchFieldException   if the field does not exist
      * @throws IllegalAccessException if access checking fails, or if the field is {@code static}
-     * @see java.lang.invoke.MethodHandles.Lookup#findGetter(Class, String, Class)
+     * @see MethodHandleHelper#findGetter(Class, String, Class)
      */
     public static MethodHandle findGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return LookupHelper.LOOKUP.in(owner).findGetter(owner, name, type);
+        return MethodHandleHelper.findGetter(owner, name, type);
     }
 
     /**
@@ -321,11 +322,11 @@ public final class ReflectionUtils {
      * @throws IllegalAccessException if access checking fails, or if the field is not {@code static}
      */
     public static MethodHandle findStaticGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return LookupHelper.LOOKUP.in(owner).findStaticGetter(owner, name, type);
+        return MethodHandleHelper.findStaticGetter(owner, name, type);
     }
 
     public static MethodHandle findSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return LookupHelper.LOOKUP.in(owner).findSetter(owner, name, type);
+        return MethodHandleHelper.findSetter(owner, name, type);
     }
 
     public static <O, T extends O> MethodHandle findSetterAndBind(Class<T> owner, O instance, String name, Class<?> type) throws ReflectiveOperationException {
@@ -333,7 +334,7 @@ public final class ReflectionUtils {
     }
 
     public static MethodHandle findStaticSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-        return LookupHelper.LOOKUP.in(owner).findStaticSetter(owner, name, type);
+        return MethodHandleHelper.findStaticSetter(owner, name, type);
     }
 
     /**
@@ -362,24 +363,264 @@ public final class ReflectionUtils {
         return (Class<T>) loader.loadClass(name);
     }
 
+    /**
+     * Produces a method handle for a virtual method.
+     * The type of the method handle will be that of the method,
+     * with the receiver type (usually {@code owner}) prepended.
+     * The method and all its argument types must be accessible to the lookup object.
+     * <p>
+     * When called, the handle will treat the first argument as a receiver
+     * and, for non-private methods, dispatch on the receiver's type to determine which method
+     * implementation to enter.
+     * For private methods the named method in {@code owner} will be invoked on the receiver.
+     * (The dispatching action is identical with that performed by an
+     * {@code invokevirtual} or {@code invokeinterface} instruction.)
+     * <p>
+     * The first argument will be of type {@code owner} if the lookup
+     * class has full privileges to access the member.  Otherwise
+     * the member must be {@code protected} and the first argument
+     * will be restricted in type to the lookup class.
+     * <p>
+     * The returned method handle will have
+     * {@linkplain MethodHandle#asVarargsCollector variable arity} if and only if
+     * the method's variable arity modifier bit ({@code 0x0080}) is set.
+     * <p>
+     * Because of the general <a href="MethodHandles.Lookup.html#equiv">equivalence</a> between {@code invokevirtual}
+     * instructions and method handles produced by {@code findVirtual},
+     * if the class is {@code MethodHandle} and the name string is
+     * {@code invokeExact} or {@code invoke}, the resulting
+     * method handle is equivalent to one produced by
+     * {@link java.lang.invoke.MethodHandles#exactInvoker MethodHandles.exactInvoker} or
+     * {@link java.lang.invoke.MethodHandles#invoker MethodHandles.invoker}
+     * with the same {@code type} argument.
+     * <p>
+     * If the class is {@code VarHandle} and the name string corresponds to
+     * the name of a signature-polymorphic access mode method, the resulting
+     * method handle is equivalent to one produced by
+     * {@link java.lang.invoke.MethodHandles#varHandleInvoker} with
+     * the access mode corresponding to the name string and with the same
+     * {@code type} arguments.
+     *
+     * @param owner          The class or interface from which the method is accessed
+     * @param name           The name of the method
+     * @param returnType     The return type of the method
+     * @param parameterTypes The types of the parameters the method accepts, in order
+     * @return the desired method handle
+     * @throws NoSuchMethodException  if the method does not exist
+     * @throws IllegalAccessException if access checking fails,
+     *                                or if the method is {@code static},
+     *                                or if the method's variable arity modifier bit
+     *                                is set and {@code asVarargsCollector} fails
+     * @throws SecurityException      if a security manager is present and it
+     *                                <a href="MethodHandles.Lookup.html#secmgr">refuses access</a>
+     * @throws NullPointerException   if any argument is null
+     * @see #findVirtual(Class, String, MethodType)
+     */
     public static MethodHandle findVirtual(Class<?> owner, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
         return findVirtual(owner, name, MethodType.methodType(returnType, parameterTypes));
     }
 
     public static MethodHandle findVirtual(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
-        return LookupHelper.LOOKUP.in(owner).findVirtual(owner, name, type);
+        return MethodHandleHelper.findVirtual(owner, name, type);
     }
 
-    public static <O, T extends O> MethodHandle findVirtualAndBind(Class<T> owner, O instance, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
-        return findVirtualAndBind(owner, instance, name, MethodType.methodType(returnType, params));
+    public static <O, T extends O> MethodHandle findVirtualAndBind(Class<T> owner, O instance, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
+        return findVirtualAndBind(owner, instance, name, MethodType.methodType(returnType, parameterTypes));
     }
 
     public static <O, T extends O> MethodHandle findVirtualAndBind(Class<T> owner, O instance, String name, MethodType type) throws ReflectiveOperationException {
         return findVirtual(owner, name, type).bindTo(instance);
     }
 
-    public static MethodHandle findStatic(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
-        return LookupHelper.LOOKUP.in(owner).findStatic(owner, name, MethodType.methodType(returnType, params));
+    public static MethodHandle findStatic(Class<?> owner, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
+        return findStatic(owner, name, MethodType.methodType(returnType, parameterTypes));
+    }
+
+    public static MethodHandle findStatic(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
+        return MethodHandleHelper.findStatic(owner, name, type);
+    }
+
+    public static MethodHandle findConstructor(Class<?> owner, Class<?>... parameterTypes) throws ReflectiveOperationException {
+        return findConstructor(owner, MethodType.methodType(void.class, parameterTypes));
+    }
+
+    public static MethodHandle findConstructor(Class<?> owner, MethodType type) throws ReflectiveOperationException {
+        return MethodHandleHelper.findConstructor(owner, type);
+    }
+
+    public static MethodHandle findSpecial(Class<?> owner, String name, Class<?> specialCaller, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
+        return findSpecial(owner, name, specialCaller, MethodType.methodType(returnType, parameterTypes));
+    }
+
+    public static MethodHandle findSpecial(Class<?> owner, String name, Class<?> specialCaller, MethodType type) throws ReflectiveOperationException {
+        return MethodHandleHelper.findSpecial(owner, name, specialCaller, type);
+    }
+
+    /**
+     * Produces a VarHandle giving access to a non-static field {@code name}
+     * of type {@code type} declared in a class of type {@code owner}.
+     * The VarHandle's variable type is {@code type} and it has one
+     * coordinate type, {@code owner}.
+     * <p>
+     * Access checking is performed immediately on behalf of the lookup
+     * class.
+     * <p>
+     * Certain access modes of the returned VarHandle are unsupported under
+     * the following conditions:
+     * <ul>
+     * <li>if the field is declared {@code final}, then the write, atomic
+     *     update, numeric atomic update, and bitwise atomic update access
+     *     modes are unsupported.
+     * <li>if the field type is anything other than {@code byte},
+     *     {@code short}, {@code char}, {@code int}, {@code long},
+     *     {@code float}, or {@code double} then numeric atomic update
+     *     access modes are unsupported.
+     * <li>if the field type is anything other than {@code boolean},
+     *     {@code byte}, {@code short}, {@code char}, {@code int} or
+     *     {@code long} then bitwise atomic update access modes are
+     *     unsupported.
+     * </ul>
+     * <p>
+     * If the field is declared {@code volatile} then the returned VarHandle
+     * will override access to the field (effectively ignore the
+     * {@code volatile} declaration) in accordance to its specified
+     * access modes.
+     * <p>
+     * If the field type is {@code float} or {@code double} then numeric
+     * and atomic update access modes compare values using their bitwise
+     * representation (see {@link Float#floatToRawIntBits} and
+     * {@link Double#doubleToRawLongBits}, respectively).
+     *
+     * @param owner The receiver class, of type {@code R}, that declares the non-static field
+     * @param name  The field's name
+     * @param type  The field's type, of type {@code T}
+     * @return a VarHandle giving access to non-static fields.
+     * @throws NoSuchFieldException   if the field does not exist
+     * @throws IllegalAccessException if access checking fails, or if the field is {@code static}
+     * @throws SecurityException      if a security manager is present and it
+     *                                <a href="MethodHandles.Lookup.html#secmgr">refuses access</a>
+     * @throws NullPointerException   if any argument is null
+     * @apiNote Bitwise comparison of {@code float} values or {@code double} values,
+     * as performed by the numeric and atomic update access modes, differ
+     * from the primitive {@code ==} operator and the {@link Float#equals}
+     * and {@link Double#equals} methods, specifically with respect to
+     * comparing NaN values or comparing {@code -0.0} with {@code +0.0}.
+     * Care should be taken when performing a compare and set or a compare
+     * and exchange operation with such values since the operation may
+     * unexpectedly fail.
+     * There are many possible NaN values that are considered to be
+     * {@code NaN} in Java, although no IEEE 754 floating-point operation
+     * provided by Java can distinguish between them.  Operation failure can
+     * occur if the expected or witness value is a NaN value and it is
+     * transformed (perhaps in a platform specific manner) into another NaN
+     * value, and thus has a different bitwise representation (see
+     * {@link Float#intBitsToFloat} or {@link Double#longBitsToDouble} for more
+     * details).
+     * The values {@code -0.0} and {@code +0.0} have different bitwise
+     * representations but are considered equal when using the primitive
+     * {@code ==} operator.  Operation failure can occur if, for example, a
+     * numeric algorithm computes an expected value to be say {@code -0.0}
+     * and previously computed the witness value to be say {@code +0.0}.
+     */
+    public static VarHandle findVarHandle(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
+        return VarHandleHelper.findVarHandle(owner, name, type);
+    }
+
+    /**
+     * Produces a VarHandle giving access to a static field {@code name} of
+     * type {@code type} declared in a class of type {@code owner}.
+     * The VarHandle's variable type is {@code type} and it has no
+     * coordinate types.
+     * <p>
+     * Access checking is performed immediately on behalf of the lookup
+     * class.
+     * <p>
+     * If the returned VarHandle is operated on, the declaring class will be
+     * initialized, if it has not already been initialized.
+     * <p>
+     * Certain access modes of the returned VarHandle are unsupported under
+     * the following conditions:
+     * <ul>
+     * <li>if the field is declared {@code final}, then the write, atomic
+     *     update, numeric atomic update, and bitwise atomic update access
+     *     modes are unsupported.
+     * <li>if the field type is anything other than {@code byte},
+     *     {@code short}, {@code char}, {@code int}, {@code long},
+     *     {@code float}, or {@code double}, then numeric atomic update
+     *     access modes are unsupported.
+     * <li>if the field type is anything other than {@code boolean},
+     *     {@code byte}, {@code short}, {@code char}, {@code int} or
+     *     {@code long} then bitwise atomic update access modes are
+     *     unsupported.
+     * </ul>
+     * <p>
+     * If the field is declared {@code volatile} then the returned VarHandle
+     * will override access to the field (effectively ignore the
+     * {@code volatile} declaration) in accordance to its specified
+     * access modes.
+     * <p>
+     * If the field type is {@code float} or {@code double} then numeric
+     * and atomic update access modes compare values using their bitwise
+     * representation (see {@link Float#floatToRawIntBits} and
+     * {@link Double#doubleToRawLongBits}, respectively).
+     *
+     * @param owner The class that declares the static field
+     * @param name  The field's name
+     * @param type  The field's type, of type {@code T}
+     * @return a VarHandle giving access to a static field
+     * @throws NoSuchFieldException   if the field does not exist
+     * @throws IllegalAccessException if access checking fails, or if the field is not {@code static}
+     * @throws SecurityException      if a security manager is present and it
+     *                                <a href="MethodHandles.Lookup.html#secmgr">refuses access</a>
+     * @throws NullPointerException   if any argument is null
+     * @apiNote Bitwise comparison of {@code float} values or {@code double} values,
+     * as performed by the numeric and atomic update access modes, differ
+     * from the primitive {@code ==} operator and the {@link Float#equals}
+     * and {@link Double#equals} methods, specifically with respect to
+     * comparing NaN values or comparing {@code -0.0} with {@code +0.0}.
+     * Care should be taken when performing a compare and set or a compare
+     * and exchange operation with such values since the operation may
+     * unexpectedly fail.
+     * There are many possible NaN values that are considered to be
+     * {@code NaN} in Java, although no IEEE 754 floating-point operation
+     * provided by Java can distinguish between them.  Operation failure can
+     * occur if the expected or witness value is a NaN value and it is
+     * transformed (perhaps in a platform specific manner) into another NaN
+     * value, and thus has a different bitwise representation (see
+     * {@link Float#intBitsToFloat} or {@link Double#longBitsToDouble} for more
+     * details).
+     * The values {@code -0.0} and {@code +0.0} have different bitwise
+     * representations but are considered equal when using the primitive
+     * {@code ==} operator.  Operation failure can occur if, for example, a
+     * numeric algorithm computes an expected value to be say {@code -0.0}
+     * and previously computed the witness value to be say {@code +0.0}.
+     */
+    public static VarHandle findStaticVarHandle(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
+        return VarHandleHelper.findStaticVarHandle(owner, name, type);
+    }
+
+    public static MethodHandle unreflect(Method m) throws ReflectiveOperationException {
+        return MethodHandleHelper.unreflect(m);
+    }
+
+    public static MethodHandle unreflectConstructor(Constructor<?> c) throws ReflectiveOperationException {
+        return MethodHandleHelper.unreflectConstructor(c);
+    }
+
+    public static MethodHandle unreflectSpecial(Method m) throws ReflectiveOperationException {
+        return MethodHandleHelper.unreflectSpecial(m);
+    }
+
+    public static MethodHandle unreflectGetter(Field f) throws ReflectiveOperationException {
+        return MethodHandleHelper.unreflectGetter(f);
+    }
+
+    public static MethodHandle unreflectSetter(Field f) throws ReflectiveOperationException {
+        return MethodHandleHelper.unreflectSetter(f);
+    }
+
+    public static VarHandle unreflectVarHandle(Field f) throws ReflectiveOperationException {
+        return VarHandleHelper.unreflectVarHandle(f);
     }
 
     /**
@@ -391,11 +632,10 @@ public final class ReflectionUtils {
     @NotNull
     public static <T> Class<T> ensureInitialized(@NotNull Class<T> clazz) {
         try {
-            LookupHelper.LOOKUP.in(clazz).ensureInitialized(clazz);
+            return LookupHelper.ensureInitialized(clazz);
         } catch (IllegalAccessException e) {
-            throw new RuntimeException("Failed to ensure " + getModuleInclusiveClassName(clazz) + " was initialized", e);
+            throw new RuntimeException("Failed to ensure initialization of class " + getModuleInclusiveClassName(clazz), e);
         }
-        return clazz;
     }
 
     /**
@@ -440,7 +680,7 @@ public final class ReflectionUtils {
     /**
      * Helper class that holds a trusted {@link MethodHandles.Lookup} instance. <br>
      *
-     * @author Lollopollqo
+     * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      * @implNote Initializing this class from outside of {@link UnsafeHelper} <b>will</b> result in an access violation due to incorrect classloading order
      */
     private static final class LookupHelper {
@@ -468,6 +708,17 @@ public final class ReflectionUtils {
             }
 
             LOOKUP = getTrustedLookup();
+        }
+
+        /**
+         * Ensures the specified class is initialized.
+         *
+         * @param clazz the class whose initialization is to be ensured
+         * @return the initialized class
+         */
+        private static <T> Class<T> ensureInitialized(Class<T> clazz) throws IllegalAccessException {
+            LookupHelper.LOOKUP.in(clazz).ensureInitialized(clazz);
+            return clazz;
         }
 
         /**
@@ -519,10 +770,11 @@ public final class ReflectionUtils {
     /**
      * Helper class that makes working with {@link MethodHandle}s easier.
      *
-     * @author Lollopollqo
+     * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
     private static final class MethodHandleHelper {
-        // TODO: Bridges for findSpecial and findConstructor, documentation
+        // TODO: documentation
+
         /**
          * Produces a method handle giving read access to a non-static field.
          * The type of the method handle will have a return type of the field's
@@ -565,77 +817,28 @@ public final class ReflectionUtils {
             return LookupHelper.LOOKUP.in(owner).findStaticGetter(owner, name, type);
         }
 
-        /**
-         * Produces a method handle for a virtual method.
-         * The type of the method handle will be that of the method,
-         * with the receiver type (usually {@code refc}) prepended.
-         * The method and all its argument types must be accessible to the lookup object.
-         * <p>
-         * When called, the handle will treat the first argument as a receiver
-         * and, for non-private methods, dispatch on the receiver's type to determine which method
-         * implementation to enter.
-         * For private methods the named method in {@code refc} will be invoked on the receiver.
-         * (The dispatching action is identical with that performed by an
-         * {@code invokevirtual} or {@code invokeinterface} instruction.)
-         * <p>
-         * The first argument will be of type {@code refc} if the lookup
-         * class has full privileges to access the member.  Otherwise
-         * the member must be {@code protected} and the first argument
-         * will be restricted in type to the lookup class.
-         * <p>
-         * The returned method handle will have
-         * {@linkplain MethodHandle#asVarargsCollector variable arity} if and only if
-         * the method's variable arity modifier bit ({@code 0x0080}) is set.
-         * <p>
-         * Because of the general <a href="MethodHandles.Lookup.html#equiv">equivalence</a> between {@code invokevirtual}
-         * instructions and method handles produced by {@code findVirtual},
-         * if the class is {@code MethodHandle} and the name string is
-         * {@code invokeExact} or {@code invoke}, the resulting
-         * method handle is equivalent to one produced by
-         * {@link java.lang.invoke.MethodHandles#exactInvoker MethodHandles.exactInvoker} or
-         * {@link java.lang.invoke.MethodHandles#invoker MethodHandles.invoker}
-         * with the same {@code type} argument.
-         * <p>
-         * If the class is {@code VarHandle} and the name string corresponds to
-         * the name of a signature-polymorphic access mode method, the resulting
-         * method handle is equivalent to one produced by
-         * {@link java.lang.invoke.MethodHandles#varHandleInvoker} with
-         * the access mode corresponding to the name string and with the same
-         * {@code type} arguments.
-         *
-         * @param owner          The class or interface from which the method is accessed
-         * @param name           The name of the method
-         * @param returnType     The return type of the method
-         * @param parameterTypes The types of the parameters the method accepts, in order
-         * @return the desired method handle
-         * @throws NoSuchMethodException  if the method does not exist
-         * @throws IllegalAccessException if access checking fails,
-         *                                or if the method is {@code static},
-         *                                or if the method's variable arity modifier bit
-         *                                is set and {@code asVarargsCollector} fails
-         * @throws SecurityException      if a security manager is present and it
-         *                                <a href="MethodHandles.Lookup.html#secmgr">refuses access</a>
-         * @throws NullPointerException   if any argument is null
-         * @see #findVirtual(Class, String, MethodType)
-         */
-        private static MethodHandle findVirtual(Class<?> owner, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
-            return findVirtual(owner, name, MethodType.methodType(returnType, parameterTypes));
+        private static MethodHandle findSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(owner).findSetter(owner, name, type);
+        }
+
+        public static MethodHandle findStaticSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(owner).findStaticSetter(owner, name, type);
         }
 
         /**
          * Produces a method handle for a virtual method.
          * The type of the method handle will be that of the method,
-         * with the receiver type (usually {@code refc}) prepended.
+         * with the receiver type (usually {@code owner}) prepended.
          * The method and all its argument types must be accessible to the lookup object.
          * <p>
          * When called, the handle will treat the first argument as a receiver
          * and, for non-private methods, dispatch on the receiver's type to determine which method
          * implementation to enter.
-         * For private methods the named method in {@code refc} will be invoked on the receiver.
+         * For private methods the named method in {@code owner} will be invoked on the receiver.
          * (The dispatching action is identical with that performed by an
          * {@code invokevirtual} or {@code invokeinterface} instruction.)
          * <p>
-         * The first argument will be of type {@code refc} if the lookup
+         * The first argument will be of type {@code owner} if the lookup
          * class has full privileges to access the member.  Otherwise
          * the member must be {@code protected} and the first argument
          * will be restricted in type to the lookup class.
@@ -678,12 +881,36 @@ public final class ReflectionUtils {
             return LookupHelper.LOOKUP.in(owner).findVirtual(owner, name, type);
         }
 
-        private static MethodHandle findStatic(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException {
-            return findStatic(owner, name, MethodType.methodType(returnType, params));
-        }
-
         private static MethodHandle findStatic(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
             return LookupHelper.LOOKUP.in(owner).findStatic(owner, name, type);
+        }
+
+        private static MethodHandle findSpecial(Class<?> owner, String name, Class<?> specialCaller, MethodType type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.findSpecial(owner, name, type, specialCaller);
+        }
+
+        private static MethodHandle findConstructor(Class<?> owner, MethodType type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(owner).findConstructor(owner, type);
+        }
+
+        private static MethodHandle unreflect(Method m) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(m.getDeclaringClass()).unreflect(m);
+        }
+
+        private static MethodHandle unreflectSpecial(Method m) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(m.getDeclaringClass()).unreflectSpecial(m, m.getDeclaringClass());
+        }
+
+        private static MethodHandle unreflectConstructor(Constructor<?> c) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(c.getDeclaringClass()).unreflectConstructor(c);
+        }
+
+        private static MethodHandle unreflectGetter(Field f) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(f.getDeclaringClass()).unreflectGetter(f);
+        }
+
+        private static MethodHandle unreflectSetter(Field f) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(f.getDeclaringClass()).unreflectSetter(f);
         }
 
         /**
@@ -703,9 +930,157 @@ public final class ReflectionUtils {
     /**
      * Helper class that makes working with {@link VarHandle}s easier.
      *
-     * @author Lollopollqo
+     * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
     private static final class VarHandleHelper {
+
+        /**
+         * Produces a VarHandle giving access to a non-static field {@code name}
+         * of type {@code type} declared in a class of type {@code owner}.
+         * The VarHandle's variable type is {@code type} and it has one
+         * coordinate type, {@code owner}.
+         * <p>
+         * Access checking is performed immediately on behalf of the lookup
+         * class.
+         * <p>
+         * Certain access modes of the returned VarHandle are unsupported under
+         * the following conditions:
+         * <ul>
+         * <li>if the field is declared {@code final}, then the write, atomic
+         *     update, numeric atomic update, and bitwise atomic update access
+         *     modes are unsupported.
+         * <li>if the field type is anything other than {@code byte},
+         *     {@code short}, {@code char}, {@code int}, {@code long},
+         *     {@code float}, or {@code double} then numeric atomic update
+         *     access modes are unsupported.
+         * <li>if the field type is anything other than {@code boolean},
+         *     {@code byte}, {@code short}, {@code char}, {@code int} or
+         *     {@code long} then bitwise atomic update access modes are
+         *     unsupported.
+         * </ul>
+         * <p>
+         * If the field is declared {@code volatile} then the returned VarHandle
+         * will override access to the field (effectively ignore the
+         * {@code volatile} declaration) in accordance to its specified
+         * access modes.
+         * <p>
+         * If the field type is {@code float} or {@code double} then numeric
+         * and atomic update access modes compare values using their bitwise
+         * representation (see {@link Float#floatToRawIntBits} and
+         * {@link Double#doubleToRawLongBits}, respectively).
+         *
+         * @param owner The receiver class, of type {@code R}, that declares the non-static field
+         * @param name  The field's name
+         * @param type  The field's type, of type {@code T}
+         * @return a VarHandle giving access to non-static fields.
+         * @throws NoSuchFieldException   if the field does not exist
+         * @throws IllegalAccessException if access checking fails, or if the field is {@code static}
+         * @throws SecurityException      if a security manager is present and it
+         *                                <a href="MethodHandles.Lookup.html#secmgr">refuses access</a>
+         * @throws NullPointerException   if any argument is null
+         * @apiNote Bitwise comparison of {@code float} values or {@code double} values,
+         * as performed by the numeric and atomic update access modes, differ
+         * from the primitive {@code ==} operator and the {@link Float#equals}
+         * and {@link Double#equals} methods, specifically with respect to
+         * comparing NaN values or comparing {@code -0.0} with {@code +0.0}.
+         * Care should be taken when performing a compare and set or a compare
+         * and exchange operation with such values since the operation may
+         * unexpectedly fail.
+         * There are many possible NaN values that are considered to be
+         * {@code NaN} in Java, although no IEEE 754 floating-point operation
+         * provided by Java can distinguish between them.  Operation failure can
+         * occur if the expected or witness value is a NaN value and it is
+         * transformed (perhaps in a platform specific manner) into another NaN
+         * value, and thus has a different bitwise representation (see
+         * {@link Float#intBitsToFloat} or {@link Double#longBitsToDouble} for more
+         * details).
+         * The values {@code -0.0} and {@code +0.0} have different bitwise
+         * representations but are considered equal when using the primitive
+         * {@code ==} operator.  Operation failure can occur if, for example, a
+         * numeric algorithm computes an expected value to be say {@code -0.0}
+         * and previously computed the witness value to be say {@code +0.0}.
+         */
+        private static VarHandle findVarHandle(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(owner).findVarHandle(owner, name, type);
+        }
+
+        /**
+         * Produces a VarHandle giving access to a static field {@code name} of
+         * type {@code type} declared in a class of type {@code owner}.
+         * The VarHandle's variable type is {@code type} and it has no
+         * coordinate types.
+         * <p>
+         * Access checking is performed immediately on behalf of the lookup
+         * class.
+         * <p>
+         * If the returned VarHandle is operated on, the declaring class will be
+         * initialized, if it has not already been initialized.
+         * <p>
+         * Certain access modes of the returned VarHandle are unsupported under
+         * the following conditions:
+         * <ul>
+         * <li>if the field is declared {@code final}, then the write, atomic
+         *     update, numeric atomic update, and bitwise atomic update access
+         *     modes are unsupported.
+         * <li>if the field type is anything other than {@code byte},
+         *     {@code short}, {@code char}, {@code int}, {@code long},
+         *     {@code float}, or {@code double}, then numeric atomic update
+         *     access modes are unsupported.
+         * <li>if the field type is anything other than {@code boolean},
+         *     {@code byte}, {@code short}, {@code char}, {@code int} or
+         *     {@code long} then bitwise atomic update access modes are
+         *     unsupported.
+         * </ul>
+         * <p>
+         * If the field is declared {@code volatile} then the returned VarHandle
+         * will override access to the field (effectively ignore the
+         * {@code volatile} declaration) in accordance to its specified
+         * access modes.
+         * <p>
+         * If the field type is {@code float} or {@code double} then numeric
+         * and atomic update access modes compare values using their bitwise
+         * representation (see {@link Float#floatToRawIntBits} and
+         * {@link Double#doubleToRawLongBits}, respectively).
+         *
+         * @param owner The class that declares the static field
+         * @param name  The field's name
+         * @param type  The field's type, of type {@code T}
+         * @return a VarHandle giving access to a static field
+         * @throws NoSuchFieldException   if the field does not exist
+         * @throws IllegalAccessException if access checking fails, or if the field is not {@code static}
+         * @throws SecurityException      if a security manager is present and it
+         *                                <a href="MethodHandles.Lookup.html#secmgr">refuses access</a>
+         * @throws NullPointerException   if any argument is null
+         * @apiNote Bitwise comparison of {@code float} values or {@code double} values,
+         * as performed by the numeric and atomic update access modes, differ
+         * from the primitive {@code ==} operator and the {@link Float#equals}
+         * and {@link Double#equals} methods, specifically with respect to
+         * comparing NaN values or comparing {@code -0.0} with {@code +0.0}.
+         * Care should be taken when performing a compare and set or a compare
+         * and exchange operation with such values since the operation may
+         * unexpectedly fail.
+         * There are many possible NaN values that are considered to be
+         * {@code NaN} in Java, although no IEEE 754 floating-point operation
+         * provided by Java can distinguish between them.  Operation failure can
+         * occur if the expected or witness value is a NaN value and it is
+         * transformed (perhaps in a platform specific manner) into another NaN
+         * value, and thus has a different bitwise representation (see
+         * {@link Float#intBitsToFloat} or {@link Double#longBitsToDouble} for more
+         * details).
+         * The values {@code -0.0} and {@code +0.0} have different bitwise
+         * representations but are considered equal when using the primitive
+         * {@code ==} operator.  Operation failure can occur if, for example, a
+         * numeric algorithm computes an expected value to be say {@code -0.0}
+         * and previously computed the witness value to be say {@code +0.0}.
+         */
+        private static VarHandle findStaticVarHandle(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(owner).findStaticVarHandle(owner, name, type);
+        }
+
+        private static VarHandle unreflectVarHandle(Field f) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.in(f.getDeclaringClass()).unreflectVarHandle(f);
+        }
+
         /**
          * Private constructor to prevent instantiation.
          */
@@ -724,7 +1099,7 @@ public final class ReflectionUtils {
      * Helper class that simplifies the process of bypassing module access checks <br>
      * (meaning exporting / opening packages to modules they aren't normally exported / opened to).
      *
-     * @author Lollopollqo
+     * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
     private static final class ModuleHelper {
         /**
@@ -964,7 +1339,7 @@ public final class ReflectionUtils {
      * Helper class that holds references to the {@link sun.misc.Unsafe} and {@link jdk.internal.misc.Unsafe} instances. <br>
      * This class also contains a few methods that make working with the two <code>Unsafe</code> classes easier.
      *
-     * @author Lollopollqo
+     * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
     private static final class UnsafeHelper {
         /**
