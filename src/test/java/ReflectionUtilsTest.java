@@ -5,15 +5,15 @@ public class ReflectionUtilsTest {
     @Test
     void testInit() {
         Assertions.assertDoesNotThrow(
-            () -> {
-                Class<?> classReflectionUtils = null;
-                try {
-                    classReflectionUtils = Class.forName("me.lollopollqo.sus.injection.util.ReflectionUtils");
-                } catch (ClassNotFoundException cnfe) {
-                    // This should never happen
+                () -> {
+                    Class<?> classReflectionUtils = null;
+                    try {
+                        classReflectionUtils = Class.forName("me.lollopollqo.sus.injection.util.ReflectionUtils");
+                    } catch (ClassNotFoundException cnfe) {
+                        // This should never happen
+                    }
+                    return classReflectionUtils;
                 }
-                return classReflectionUtils;
-            }
         );
     }
 }
