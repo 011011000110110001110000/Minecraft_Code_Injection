@@ -654,7 +654,7 @@ public final class ReflectionUtils {
     }
 
     /**
-     * Gets the full name of the specified class, including the module it's defined in.
+     * Gets the full name of the specified class, including the name of the module it's defined in.
      *
      * @param clazz the class whose name is to be determined
      * @return a String obtained by concatenating the name of the module the specified class is defined in and the name of the class itself, separated by the <code>'/'</code> character
