@@ -1448,7 +1448,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Export the {@link jdk.internal.misc}, {@link jdk.internal.access} and {@link jdk.internal.reflect} packages to this class' module.
+         * Exports the {@link jdk.internal.misc}, {@link jdk.internal.access} and {@link jdk.internal.reflect} packages to this class' module.
          */
         private static void enableJdkInternalsAccess() {
             if (UNSAFE == null) {
