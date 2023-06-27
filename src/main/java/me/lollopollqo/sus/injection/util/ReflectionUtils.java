@@ -723,9 +723,9 @@ public final class ReflectionUtils {
 
     @SuppressWarnings("unchecked")
     public static Map<Class<?>, Set<String>> removeFieldReflectionFiltersForClass(Class<?> clazz) throws Throwable {
-        Map<Class<?>, Set<String>> fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapGetter.invoke();
-        Map<Class<?>, Set<String>> original = Map.copyOf(fieldFilterMap);
-        Map<Class<?>, Set<String>> newFilterMap = new HashMap<>(fieldFilterMap);
+        final Map<Class<?>, Set<String>> fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapGetter.invoke();
+        final Map<Class<?>, Set<String>> original = Map.copyOf(fieldFilterMap);
+        final Map<Class<?>, Set<String>> newFilterMap = new HashMap<>(fieldFilterMap);
         newFilterMap.remove(clazz);
         fieldFilterMapSetter.invoke(Collections.unmodifiableMap(newFilterMap));
 
