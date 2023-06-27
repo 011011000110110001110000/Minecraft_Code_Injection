@@ -1,14 +1,14 @@
 package me.lollopollqo.sus.injection.util;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * <b>WIP</b> <br>
@@ -19,10 +19,12 @@ import java.util.List;
  */
 @SuppressWarnings("unused")
 public final class ReflectionUtils {
-    /**
-     * Cached {@link MethodHandle} for {@link Class#reflectionData()}
-     */
-    private static final MethodHandle reflectionDataHandle;
+
+    private static final MethodHandle fieldFilterMapGetter;
+    private static final MethodHandle methodFilterMapGetter;
+
+    private static final MethodHandle fieldFilterMapSetter;
+    private static final MethodHandle methodFilterMapSetter;
 
     static {
         // Ensure UnsafeHelper's initializer is invoked before the other Helper classes' ones by accessing a static member.
@@ -34,19 +36,26 @@ public final class ReflectionUtils {
         // Handle this here to ensure it only happens after all the necessary initialization steps have happened
         ModuleHelper.getSpecialModules();
 
-        final String reflectionDataClassName = "java.lang.Class$ReflectionData";
-        final Class<?> reflectionDataClass;
+
+        final String reflectionClassName = "jdk.internal.reflect.Reflection";
+        final Class<?> reflectionClass;
+
         try {
-            reflectionDataClass = Class.forName(reflectionDataClassName);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException("Could not find " + reflectionDataClassName, e);
+            reflectionClass = Class.forName(reflectionClassName);
+        } catch (ClassNotFoundException cnfe) {
+            throw new RuntimeException(cnfe);
         }
 
         try {
-            reflectionDataHandle = findVirtual(Class.class, "reflectionData", reflectionDataClass);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Could not get MethodHandle for java.lang.Class#reflectionData()", e);
+            fieldFilterMapGetter = MethodHandleHelper.findStaticGetter(reflectionClass, "fieldFilterMap", Map.class);
+            methodFilterMapGetter = MethodHandleHelper.findStaticGetter(reflectionClass, "methodFilterMap", Map.class);
+
+            fieldFilterMapSetter = MethodHandleHelper.findStaticSetter(reflectionClass, "fieldFilterMap", Map.class);
+            methodFilterMapSetter = MethodHandleHelper.findStaticSetter(reflectionClass, "methodFilterMap", Map.class);
+        } catch (ReflectiveOperationException roe) {
+            throw new RuntimeException(roe);
         }
+
     }
 
     /**
@@ -682,6 +691,59 @@ public final class ReflectionUtils {
         return clazz.getModule().getName() + '/' + clazz.getName();
     }
 
+    @SuppressWarnings("unchecked")
+    private static Map<Class<?>, Set<String>> removeReflectionFilters(MemberType memberType) {
+        try {
+            final Map<Class<?>, Set<String>> filterMap;
+            final Map<Class<?>, Set<String>> originalFilterMap;
+            final MethodHandle getter;
+            final MethodHandle setter;
+
+            switch (memberType) {
+                case FIELD -> {
+                    getter = fieldFilterMapGetter;
+                    setter = fieldFilterMapSetter;
+                }
+                case METHOD -> {
+                    getter = methodFilterMapGetter;
+                    setter = methodFilterMapSetter;
+                }
+                default -> throw new IllegalArgumentException("Unknown member type: " + memberType);
+            }
+
+            filterMap = (Map<Class<?>, Set<String>>) getter.invoke();
+            originalFilterMap = Map.copyOf(filterMap);
+            setter.invoke(Map.of());
+            return originalFilterMap;
+
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Map<Class<?>, Set<String>> removeFieldReflectionFiltersForClass(Class<?> clazz) throws Throwable {
+        Map<Class<?>, Set<String>> fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapGetter.invoke();
+        Map<Class<?>, Set<String>> original = Map.copyOf(fieldFilterMap);
+        Map<Class<?>, Set<String>> newFilterMap = new HashMap<>(fieldFilterMap);
+        newFilterMap.remove(clazz);
+        fieldFilterMapSetter.invoke(Collections.unmodifiableMap(newFilterMap));
+
+        return original;
+    }
+
+    private static void setReflectionFilters(MemberType memberType, Map<Class<?>, Set<String>> filterMap) {
+        try {
+            switch (memberType) {
+                case FIELD -> fieldFilterMapSetter.invoke(filterMap);
+                case METHOD -> methodFilterMapSetter.invoke(filterMap);
+                default -> throw new IllegalArgumentException("Unknown member type: " + memberType);
+            }
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+    }
+
     /**
      * Private constructor to prevent instantiation.
      */
@@ -693,6 +755,11 @@ public final class ReflectionUtils {
 
         }
         throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.class) + callerBlame);
+    }
+
+    public enum MemberType {
+        FIELD,
+        METHOD
     }
 
     /**
