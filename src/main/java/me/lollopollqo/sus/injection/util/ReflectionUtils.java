@@ -1465,7 +1465,7 @@ public final class ReflectionUtils {
                     .getLayer()
                     .findModule(moduleName)
                     .orElseThrow(
-                            () -> new RuntimeException("Could not find module " + moduleName + "!")
+                            () -> new RuntimeException("Could not find module " + moduleName)
                     );
 
             // Need to use the unsafe version here as we obviously haven't gained access to the classes in the jdk.internal.access package (SharedSecrets, JavaLangAccess) yet
