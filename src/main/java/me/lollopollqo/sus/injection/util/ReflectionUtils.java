@@ -19,6 +19,10 @@ import java.util.List;
  */
 @SuppressWarnings("unused")
 public final class ReflectionUtils {
+    /**
+     * Cached {@link MethodHandle} for {@link Class#reflectionData()}
+     */
+    private static final MethodHandle reflectionDataHandle;
 
     static {
         // Ensure UnsafeHelper's initializer is invoked before the other Helper classes' ones by accessing a static member.
@@ -29,6 +33,20 @@ public final class ReflectionUtils {
 
         // Handle this here to ensure it only happens after all the necessary initialization steps have happened
         ModuleHelper.getSpecialModules();
+
+        final String reflectionDataClassName = "java.lang.Class$ReflectionData";
+        final Class<?> reflectionDataClass;
+        try {
+            reflectionDataClass = Class.forName(reflectionDataClassName);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Could not find " + reflectionDataClassName, e);
+        }
+
+        try {
+            reflectionDataHandle = findVirtual(Class.class, "reflectionData", reflectionDataClass);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Could not get MethodHandle for java.lang.Class#reflectionData()", e);
+        }
     }
 
     /**
