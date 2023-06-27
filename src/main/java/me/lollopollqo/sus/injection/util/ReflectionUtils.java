@@ -12,7 +12,7 @@ import java.util.*;
 
 /**
  * <b>WIP</b> <br>
- * TODO: documentation, more helpers for internal methods <br>
+ * TODO: documentation, more helpers for internal methods, disabling reflection filters, obtaining direct references to class members instead of copies (ReflectionFactory) <br>
  * Utility class that contains some useful methods for easier / more powerful reflection usage. <br>
  *
  * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
