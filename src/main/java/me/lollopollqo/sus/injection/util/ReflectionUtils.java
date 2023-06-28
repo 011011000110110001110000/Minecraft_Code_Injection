@@ -1,7 +1,6 @@
 package me.lollopollqo.sus.injection.util;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.VisibleForTesting;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
