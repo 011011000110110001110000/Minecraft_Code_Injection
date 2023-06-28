@@ -7,6 +7,7 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 
+@SuppressWarnings("unused")
 public class ReflectionUtilsTest {
     @Test
     void testInit() {
@@ -17,7 +18,9 @@ public class ReflectionUtilsTest {
         );
     }
 
+
     @Test
+    @SuppressWarnings("UnusedAssignment")
     void testRemoveFieldReflectionFilters() {
         Assertions.assertDoesNotThrow(
                 () -> {

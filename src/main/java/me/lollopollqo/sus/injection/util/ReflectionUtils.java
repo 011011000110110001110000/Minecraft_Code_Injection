@@ -40,6 +40,7 @@ public final class ReflectionUtils {
         final Class<?> reflectionClass;
 
         try {
+            // noinspection Java9ReflectionClassVisibility
             reflectionClass = Class.forName(reflectionClassName);
         } catch (ClassNotFoundException cnfe) {
             throw new RuntimeException(cnfe);

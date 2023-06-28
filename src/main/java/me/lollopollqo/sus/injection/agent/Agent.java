@@ -24,6 +24,7 @@ public class Agent {
     public static Registry registry;
     private static RemoteHandle handleStub;
 
+    @SuppressWarnings("unused")
     public static void agentmain(String args, Instrumentation in) {
         Thread.currentThread().setName("Lollopollqo's Java Agent");
         System.out.println(AGENT_HELLO_MESSAGE);
