@@ -723,6 +723,7 @@ public final class ReflectionUtils {
 
     @SuppressWarnings("unchecked")
     public static Map<Class<?>, Set<String>> removeFieldReflectionFiltersForClass(Class<?> clazz) throws Throwable {
+        LookupHelper.ensureInitialized(clazz);
         final Map<Class<?>, Set<String>> fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapGetter.invoke();
         final Map<Class<?>, Set<String>> original = Map.copyOf(fieldFilterMap);
         final Map<Class<?>, Set<String>> newFilterMap = new HashMap<>(fieldFilterMap);
