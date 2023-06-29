@@ -22,14 +22,14 @@ public class ReflectionUtilsTest {
     @Test
     @SuppressWarnings("UnusedAssignment")
     void testRemoveFieldReflectionFilters() {
+        Assertions.assertThrows(
+                NoSuchFieldException.class,
+                () -> MethodHandles.Lookup.class.getDeclaredField("lookupClass")
+        );
+
         Assertions.assertDoesNotThrow(
                 () -> {
                     final Field lookupClass;
-                    Assertions.assertThrows(
-                            NoSuchFieldException.class,
-                            () -> MethodHandles.Lookup.class.getDeclaredField("lookupClass")
-                    );
-
                     Map<Class<?>, Set<String>> original = ReflectionUtils.removeFieldReflectionFiltersForClass(MethodHandles.Lookup.class);
                     lookupClass = MethodHandles.Lookup.class.getDeclaredField("lookupClass");
                 }
