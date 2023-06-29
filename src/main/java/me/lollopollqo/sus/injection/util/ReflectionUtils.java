@@ -727,8 +727,8 @@ public final class ReflectionUtils {
         final Map<Class<?>, Set<String>> original = Map.copyOf(fieldFilterMap);
         final Map<Class<?>, Set<String>> newFilterMap = new HashMap<>(fieldFilterMap);
         newFilterMap.remove(clazz);
-        fieldFilterMapSetter.invoke(Collections.unmodifiableMap(newFilterMap));
-
+        final Map<Class<?>, Set<String>> unmodifiableNewFilterMap = Collections.unmodifiableMap(newFilterMap);
+        fieldFilterMapSetter.invoke(unmodifiableNewFilterMap);
         return original;
     }
 
