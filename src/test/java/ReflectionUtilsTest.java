@@ -59,4 +59,25 @@ public class ReflectionUtilsTest {
             System.out.println(testObj.booleanField);
         }
     }
+
+    @Test
+    void testGetter() {
+        class Test {
+            private final Object privateField;
+
+            Test() {
+                this.privateField = new Object();
+            }
+        }
+    }
+
+    @Test
+    void testSetter() {
+
+    }
+
+    @Test
+    void testTypedVarHandle() {
+
+    }
 }
