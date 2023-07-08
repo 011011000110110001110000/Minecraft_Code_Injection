@@ -8,6 +8,7 @@ module SusInjection.main {
     requires jdk.unsupported;
 
     requires org.jetbrains.annotations;
+    requires org.objectweb.asm;
 
     exports me.lollopollqo.sus.injection.util;
     exports me.lollopollqo.sus.injection.rmi;

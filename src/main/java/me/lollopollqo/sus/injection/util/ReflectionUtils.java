@@ -2,11 +2,15 @@ package me.lollopollqo.sus.injection.util;
 
 import org.jetbrains.annotations.NotNull;
 
+import org.objectweb.asm.*;
+
+import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
+import java.lang.reflect.Type;
 import java.util.*;
 
 /**
@@ -42,8 +46,10 @@ public final class ReflectionUtils {
         try {
             // noinspection Java9ReflectionClassVisibility
             reflectionClass = Class.forName(reflectionClassName);
-        } catch (ClassNotFoundException cnfe) {
-            throw new RuntimeException(cnfe);
+            ClassReader reader = new ClassReader(Class.class.getResourceAsStream("Class.class"));
+            reader.accept(new ClassClassVisitor(Opcodes.ASM9), ClassReader.SKIP_DEBUG);
+        } catch (ClassNotFoundException | IOException e) {
+            throw new RuntimeException(e);
         }
 
         try {
@@ -1571,4 +1577,47 @@ public final class ReflectionUtils {
             throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.UnsafeHelper.class) + callerBlame);
         }
     }
+
+    private static class ClassClassVisitor extends ClassVisitor {
+
+        /**
+         * Constructs a new {@link ClassVisitor}.
+         *
+         * @param api the ASM API version implemented by this visitor. Must be one of the {@code
+         *            ASM}<i>x</i> values in {@link Opcodes}.
+         */
+        protected ClassClassVisitor(int api) {
+            super(api);
+        }
+
+        /**
+         * Visits a method of the class. This method <i>must</i> return a new {@link MethodVisitor}
+         * instance (or {@literal null}) each time it is called, i.e., it should not return a previously
+         * returned visitor.
+         *
+         * @param access     the method's access flags (see {@link Opcodes}). This parameter also indicates if
+         *                   the method is synthetic and/or deprecated.
+         * @param name       the method's name.
+         * @param descriptor the method's descriptor (see {@link Type}).
+         * @param signature  the method's signature. May be {@literal null} if the method parameters,
+         *                   return type and exceptions do not use generic types.
+         * @param exceptions the internal names of the method's exception classes (see {@link
+         *                   Type#getInternalName()}). May be {@literal null}.
+         * @return an object to visit the byte code of the method, or {@literal null} if this class
+         * visitor is not interested in visiting the code of this method.
+         */
+        @Override
+        public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+            final int accessFlags = Opcodes.ACC_NATIVE | Opcodes.ACC_PRIVATE & ~Opcodes.ACC_STATIC;
+            final String nativeGetDeclaredFieldsReturnValueDesc = "[Ljava/lang/reflect/Field;";
+
+            if (access == accessFlags && descriptor.substring(descriptor.lastIndexOf(')') + 1).equals(nativeGetDeclaredFieldsReturnValueDesc)) {
+                System.out.println("name: " + name);
+            }
+
+            return super.visitMethod(access, name, descriptor, signature, exceptions);
+        }
+
+    }
+
 }
