@@ -22,6 +22,7 @@ import java.util.*;
  */
 @SuppressWarnings("unused")
 public final class ReflectionUtils {
+    private static final StackWalker STACK_WALKER;
 
     private static final MethodHandle fieldFilterMapGetter;
     private static final MethodHandle methodFilterMapGetter;
@@ -30,6 +31,8 @@ public final class ReflectionUtils {
     private static final MethodHandle methodFilterMapSetter;
 
     static {
+
+        STACK_WALKER = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
         final String reflectionClassName = "jdk.internal.reflect.Reflection";
         final String javaLangAccessName = "jdk.internal.access.JavaLangAccess";
