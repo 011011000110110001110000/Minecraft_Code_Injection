@@ -1,10 +1,8 @@
 package me.lollopollqo.sus.injection.util;
 
-import jdk.internal.access.JavaLangAccess;
-import jdk.internal.access.SharedSecrets;
 import org.jetbrains.annotations.NotNull;
-import org.objectweb.asm.*;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -22,6 +20,9 @@ import java.util.*;
  */
 @SuppressWarnings("unused")
 public final class ReflectionUtils {
+    /**
+     * Cached {@link StackWalker} instance for caller checking
+     */
     private static final StackWalker STACK_WALKER;
 
     private static final MethodHandle fieldFilterMapGetter;
@@ -1607,23 +1608,6 @@ public final class ReflectionUtils {
         }
     }
 
-    private static class Injector {
-        static {
-            Class<?> injectorClass = Injector.class;
-            Module proxyModule = injectorClass.getModule();
-            Module mainModule = injectorClass.getClassLoader().getClass().getModule();
-            proxyModule.addExports(injectorClass.getPackageName(), mainModule);
-            proxyModule.addOpens(injectorClass.getPackageName(), mainModule);
-            JavaLangAccess javaLangAccess = SharedSecrets.getJavaLangAccess();
-            javaLangAccess.addExports(Object.class.getModule(), "jdk.internal.misc", mainModule);
-
-            javaLangAccess.addExports(mainModule, "me.lollopollqo.sus.injection.util", proxyModule);
-            javaLangAccess.addReads(proxyModule, mainModule);
-
-            javaLangAccess.addOpens(Object.class.getModule(), "java.lang.invoke", mainModule);
-        }
-    }
-
     private static class InjectorClassLoader extends ClassLoader {
         InjectorClassLoader() {
             super(InjectorClassLoader.class.getClassLoader());
@@ -1639,6 +1623,32 @@ public final class ReflectionUtils {
 
     }
 
+    /**
+     * Helper class that generates an {@code Injector} class inside the given package.
+     * <p>
+     * The source of the generated class is as follows: <br>
+     *
+     * <blockquote><pre>{@code
+     * public class Injector {
+     *
+     *     static {
+     *         Class<?> injectorClass = Injector.class;
+     *         Module proxyModule = injectorClass.getModule();
+     *         Module mainModule = injectorClass.getClassLoader().getClass().getModule();
+     *         proxyModule.addExports(injectorClass.getPackageName(), mainModule);
+     *         proxyModule.addOpens(injectorClass.getPackageName(), mainModule);
+     *         jdk.internal.access.JavaLangAccess javaLangAccess = jdk.internal.access.SharedSecrets.getJavaLangAccess();
+     *         javaLangAccess.addExports(Object.class.getModule(), "jdk.internal.misc", mainModule);
+     *         javaLangAccess.addExports(mainModule, "me.lollopollqo.sus.injection.util", proxyModule);
+     *         javaLangAccess.addReads(proxyModule, mainModule);
+     *         javaLangAccess.addOpens(Object.class.getModule(), "java.lang.invoke", mainModule);
+     *     }
+     * }
+     *
+     * }</pre></blockquote>
+     *
+     * @author <a href=""></a>
+     */
     private static class InjectorGenerator {
 
         public static byte[] getBytes(final String packageName) {
