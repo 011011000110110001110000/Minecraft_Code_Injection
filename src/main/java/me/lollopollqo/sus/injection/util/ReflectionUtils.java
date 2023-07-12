@@ -53,7 +53,7 @@ public final class ReflectionUtils {
 
                 final Object proxyInstance = Proxy.newProxyInstance(
                         injectorLoader,
-                        new Class[]{
+                        new Class[] {
                                 javaLangAccessInterface
                         },
                         (proxy, method, arguments) -> null
