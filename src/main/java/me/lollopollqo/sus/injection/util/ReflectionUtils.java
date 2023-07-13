@@ -31,46 +31,24 @@ public final class ReflectionUtils {
     private static final MethodHandle fieldFilterMapSetter;
     private static final MethodHandle methodFilterMapSetter;
 
+    private static boolean initializing;
+
     static {
+
+        initializing = true;
 
         STACK_WALKER = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
+        bypassJigsaw();
+
         final String reflectionClassName = "jdk.internal.reflect.Reflection";
-        final String javaLangAccessName = "jdk.internal.access.JavaLangAccess";
         final Class<?> reflectionClass;
-        final Class<?> javaLangAccessInterface;
-        final Class<?> injectorClass;
 
-        final ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
-        final InjectorClassLoader injectorLoader = new InjectorClassLoader();
-
-        {
-            try {
-                // noinspection Java9ReflectionClassVisibility
-                reflectionClass = Class.forName(reflectionClassName);
-                // noinspection Java9ReflectionClassVisibility
-                javaLangAccessInterface = Class.forName(javaLangAccessName);
-
-                final Object proxyInstance = Proxy.newProxyInstance(
-                        injectorLoader,
-                        new Class[] {
-                                javaLangAccessInterface
-                        },
-                        (proxy, method, arguments) -> null
-                );
-
-                final String packageName = proxyInstance.getClass().getPackageName().replace(".", "/");
-
-                injectorClass = injectorLoader.defineAndLoad(InjectorGenerator.getBytes(packageName));
-
-                Constructor<?> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
-                lookupConstructor.setAccessible(true);
-
-                MethodHandles.Lookup trustedLookup = (MethodHandles.Lookup) lookupConstructor.newInstance(Object.class, null, -1);
-
-            } catch (ReflectiveOperationException roe) {
-                throw new RuntimeException(roe);
-            }
+        try {
+            // noinspection Java9ReflectionClassVisibility
+            reflectionClass = Class.forName(reflectionClassName);
+        } catch (ReflectiveOperationException roe) {
+            throw new RuntimeException(roe);
         }
 
         // Ensure UnsafeHelper's initializer is invoked before the other Helper classes' ones by accessing a static member.
@@ -91,6 +69,8 @@ public final class ReflectionUtils {
         } catch (ReflectiveOperationException roe) {
             throw new RuntimeException(roe);
         }
+
+        initializing = false;
 
     }
 
@@ -776,6 +756,34 @@ public final class ReflectionUtils {
             }
         } catch (Throwable t) {
             throw new RuntimeException(t);
+        }
+    }
+
+    @SuppressWarnings("Java9ReflectionClassVisibility") // Somewhat ironically, this method is what allows us to bypass the same restriction that causes the warning
+    private static void bypassJigsaw() {
+        final String javaLangAccessName = "jdk.internal.access.JavaLangAccess";
+        final Class<?> javaLangAccessInterface;
+        final Class<?> injectorClass;
+        final InjectorClassLoader injectorLoader = new InjectorClassLoader();
+
+        try {
+            javaLangAccessInterface = Class.forName(javaLangAccessName);
+
+            //noinspection SuspiciousInvocationHandlerImplementation
+            final Object proxyInstance = Proxy.newProxyInstance(
+                    injectorLoader,
+                    new Class[] {
+                            javaLangAccessInterface
+                    },
+                    (proxy, method, arguments) -> null
+            );
+
+            final String packageName = proxyInstance.getClass().getPackageName().replace(".", "/");
+
+            injectorClass = injectorLoader.defineAndLoad(InjectorGenerator.generateIn(packageName));
+
+        } catch (ReflectiveOperationException roe) {
+            throw new RuntimeException("Could not bypass the module system", roe);
         }
     }
 
@@ -1561,14 +1569,7 @@ public final class ReflectionUtils {
             final String miscPackageName = internalPackageName + ".misc";
             final String accessPackageName = internalPackageName + ".access";
             final String reflectPackageName = internalPackageName + ".reflect";
-            final String moduleName = "java.base";
-            final Module javaBaseModule = Object.class
-                    .getModule()
-                    .getLayer()
-                    .findModule(moduleName)
-                    .orElseThrow(
-                            () -> new RuntimeException("Could not find module " + moduleName)
-                    );
+            final Module javaBaseModule = Object.class.getModule();
 
             // Need to use the unsafe version here as we obviously haven't gained access to the classes in the jdk.internal.access package (SharedSecrets, JavaLangAccess) yet
             ModuleHelper.unsafeAddExports(javaBaseModule, miscPackageName, UnsafeHelper.class.getModule());
@@ -1609,7 +1610,7 @@ public final class ReflectionUtils {
     }
 
     /**
-     * A custom and very bare-bones implementation of {@link ClassLoader} to be used in conjunction with the class generated by {@link InjectorGenerator#getBytes(String)}.
+     * A custom and very bare-bones implementation of {@link ClassLoader} to be used in conjunction with the class generated by {@link InjectorGenerator#generateIn(String)}.
      *
      * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
@@ -1631,48 +1632,51 @@ public final class ReflectionUtils {
     /**
      * Helper class that generates an {@code Injector} class inside the given package.
      * <p>
-     * The source of the generated class is as follows: <br>
-     *
+     * The source of the generated class is as follows:
      * <blockquote><pre>{@code
      * public class Injector {
-     *
      *     static {
-     *         Class<?> injectorClass = Injector.class;
-     *         Module proxyModule = injectorClass.getModule();
-     *         Module mainModule = injectorClass.getClassLoader().getClass().getModule();
+     *         final Class<?> injectorClass = Injector.class;
+     *         final Class<?> loaderClass = injectorClass.getClassLoader().getClass();
      *
-     *         // Ensure that we can access the proxy module from our main module
-     *         proxyModule.addExports(injectorClass.getPackageName(), mainModule);
-     *         proxyModule.addOpens(injectorClass.getPackageName(), mainModule);
+     *         final Module javaBaseModule = Object.class.getModule();
+     *         final Module loaderModule = loaderClass.getModule();
      *
      *         // Obtain the jdk.internal.access.JavaLangAccess instance via jdk.internal.access.SharedSecrets
-     *         jdk.internal.access.JavaLangAccess javaLangAccess = jdk.internal.access.SharedSecrets.getJavaLangAccess();
+     *         final jdk.internal.access.JavaLangAccess javaLangAccess = jdk.internal.access.SharedSecrets.getJavaLangAccess();
      *
-     *         // Export the jdk.internal.misc package to our main module to enable jdk.internal.misc.Unsafe access
-     *         javaLangAccess.addExports(Object.class.getModule(), "jdk.internal.misc", mainModule);
+     *         // Export the jdk.internal.misc package to the loader module to enable jdk.internal.misc.Unsafe access
+     *         javaLangAccess.addExports(javaBaseModule, "jdk.internal.misc", loaderModule);
+     *         // Export the jdk.internal.access package to the loader module to enable jdk.internal.access.JavaLangAccess access
+     *         javaLangAccess.addExports(javaBaseModule, "jdk.internal.access", loaderModule);
      *
-     *         // Export the me.lollopollqo.sus.injection.util package (where ReflectionUtils is) to the proxy module and make the proxy module read the main module
-     *         javaLangAccess.addExports(mainModule, "me.lollopollqo.sus.injection.util", proxyModule);
-     *         javaLangAccess.addReads(proxyModule, mainModule);
-     *
-     *         // Open the java.lang.invoke package to our main module to enable AccessibleObject#setAccessible(boolean) usage on members of the package
-     *         javaLangAccess.addOpens(Object.class.getModule(), "java.lang.invoke", mainModule);
+     *         // Open the java.lang.invoke package to the loader module to enable AccessibleObject#setAccessible(boolean) usage on members of the classes in the package
+     *         // This will be used to be able to invoke the MethodHandles.Lookup constructor directly
+     *         javaLangAccess.addOpens(javaBaseModule, "java.lang.invoke", loaderModule);
      *     }
      * }
      *
      * }</pre></blockquote>
      * <p>
-     * In conjunction with {@link InjectorClassLoader}, this is used to define and load a class inside a proxy module.
+     * In conjunction with {@link InjectorClassLoader}, this is used to define and load a class inside a proxy module which has access to the {@link jdk.internal.access} package.
      *
      * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
     private static class InjectorGenerator {
+        /**
+         * The name of the generated injector class
+         */
+        private static final String INJECTOR_CLASS_NAME = "Injector";
 
-        public static byte[] getBytes(final String packageName) {
-
-            final String className = "Injector";
-            final String fullClassName = packageName + "/" + className;
+        /**
+         * Generates an injector class inside the given package.
+         * @param packageName The package the class should be generated in
+         * @return the bytes of the generated class
+         */
+        public static byte[] generateIn(final String packageName) {
+            final String fullClassName = packageName + "/" + INJECTOR_CLASS_NAME;
             final String descriptor = "L" + fullClassName + ";";
+            final String ownPackageName = InjectorGenerator.class.getPackageName();
 
             final ClassWriter classWriter = new ClassWriter(0);
             MethodVisitor methodVisitor;
@@ -1686,403 +1690,108 @@ public final class ReflectionUtils {
                     null
             );
 
-            // Default constructor bytecode
+            // Default constructor bytecode (<init>()V)
             {
-                methodVisitor = classWriter.visitMethod(
-                        Opcodes.ACC_PRIVATE,
-                        "<init>",
-                        "()V",
-                        null,
-                        null
-                );
+                methodVisitor = classWriter.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
 
                 methodVisitor.visitCode();
 
                 Label label0 = new Label();
                 methodVisitor.visitLabel(label0);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        0
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKESPECIAL,
-                        "java/lang/Object",
-                        "<init>",
-                        "()V",
-                        false
-                );
-
-                methodVisitor.visitInsn(
-                        Opcodes.RETURN
-                );
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 0);
+                methodVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+                methodVisitor.visitInsn(Opcodes.RETURN);
 
                 Label label1 = new Label();
                 methodVisitor.visitLabel(label1);
 
-                methodVisitor.visitLocalVariable(
-                        "this",
-                        descriptor,
-                        null,
-                        label0,
-                        label1,
-                        0
-                );
-
+                methodVisitor.visitLocalVariable("this", descriptor, null, label0, label1, 0);
                 methodVisitor.visitMaxs(1, 1);
 
                 methodVisitor.visitEnd();
             }
 
-            // Static class initializer bytecode
+            // Static class initializer bytecode (<clinit>()V)
             {
-                methodVisitor = classWriter.visitMethod(
-                        Opcodes.ACC_STATIC,
-                        "<clinit>",
-                        "()V",
-                        null,
-                        null
-                );
+                methodVisitor = classWriter.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
 
                 methodVisitor.visitCode();
 
                 Label label0 = new Label();
                 methodVisitor.visitLabel(label0);
 
-                methodVisitor.visitLdcInsn(
-                        Type.getType(descriptor)
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ASTORE,
-                        0
-                );
+                methodVisitor.visitLdcInsn(Type.getType(descriptor));
+                methodVisitor.visitVarInsn(Opcodes.ASTORE, 0);
 
                 Label label1 = new Label();
                 methodVisitor.visitLabel(label1);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        0)
-                ;
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Class",
-                        "getModule",
-                        "()Ljava/lang/Module;",
-                        false
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ASTORE,
-                        1
-                );
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 0);
+                methodVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Class", "getClassLoader", "()Ljava/lang/ClassLoader;", false);
+                methodVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false);
+                methodVisitor.visitVarInsn(Opcodes.ASTORE, 1);
 
                 Label label2 = new Label();
                 methodVisitor.visitLabel(label2);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        0
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Class",
-                        "getClassLoader",
-                        "()Ljava/lang/ClassLoader;",
-                        false
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Object",
-                        "getClass",
-                        "()Ljava/lang/Class;",
-                        false
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Class",
-                        "getModule",
-                        "()Ljava/lang/Module;",
-                        false
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ASTORE,
-                        2
-                );
+                methodVisitor.visitLdcInsn(Type.getType("Ljava/lang/Object;"));
+                methodVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Class", "getModule", "()Ljava/lang/Module;", false);
+                methodVisitor.visitVarInsn(Opcodes.ASTORE, 2);
 
                 Label label3 = new Label();
                 methodVisitor.visitLabel(label3);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        1
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        0
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Class",
-                        "getPackageName",
-                        "()Ljava/lang/String;",
-                        false
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        2
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Module",
-                        "addExports",
-                        "(Ljava/lang/String;Ljava/lang/Module;)Ljava/lang/Module;",
-                        false
-                );
-
-                methodVisitor.visitInsn(
-                        Opcodes.POP
-                );
+                methodVisitor.visitLineNumber(9, label3);
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 1);
+                methodVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Class", "getModule", "()Ljava/lang/Module;", false);
+                methodVisitor.visitVarInsn(Opcodes.ASTORE, 3);
 
                 Label label4 = new Label();
                 methodVisitor.visitLabel(label4);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        1
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        0
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Class",
-                        "getPackageName",
-                        "()Ljava/lang/String;",
-                        false
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        2
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Module",
-                        "addOpens",
-                        "(Ljava/lang/String;Ljava/lang/Module;)Ljava/lang/Module;",
-                        false
-                );
-
-                methodVisitor.visitInsn(
-                        Opcodes.POP
-                );
+                methodVisitor.visitMethodInsn(Opcodes.INVOKESTATIC, "jdk/internal/access/SharedSecrets", "getJavaLangAccess", "()Ljdk/internal/access/JavaLangAccess;", false);
+                methodVisitor.visitVarInsn(Opcodes.ASTORE, 4);
 
                 Label label5 = new Label();
                 methodVisitor.visitLabel(label5);
 
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKESTATIC,
-                        "jdk/internal/access/SharedSecrets",
-                        "getJavaLangAccess",
-                        "()Ljdk/internal/access/JavaLangAccess;",
-                        false
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ASTORE,
-                        3
-                );
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 4);
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 2);
+                methodVisitor.visitLdcInsn("jdk.internal.misc");
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 3);
+                methodVisitor.visitMethodInsn(Opcodes.INVOKEINTERFACE, "jdk/internal/access/JavaLangAccess", "addExports", "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V", true);
 
                 Label label6 = new Label();
                 methodVisitor.visitLabel(label6);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        3
-                );
-
-                methodVisitor.visitLdcInsn(
-                        Type.getType("Ljava/lang/Object;")
-                );
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Class",
-                        "getModule",
-                        "()Ljava/lang/Module;",
-                        false
-                );
-
-                methodVisitor.visitLdcInsn(
-                        "jdk.internal.misc"
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        2
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEINTERFACE,
-                        "jdk/internal/access/JavaLangAccess",
-                        "addExports",
-                        "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V",
-                        true
-                );
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 4);
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 2);
+                methodVisitor.visitLdcInsn("jdk.internal.access");
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 3);
+                methodVisitor.visitMethodInsn(Opcodes.INVOKEINTERFACE, "jdk/internal/access/JavaLangAccess", "addExports", "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V", true);
 
                 Label label7 = new Label();
                 methodVisitor.visitLabel(label7);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        3
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        2
-                );
-
-                methodVisitor.visitLdcInsn(
-                        "me.lollopollqo.sus.injection.util"
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        1
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEINTERFACE,
-                        "jdk/internal/access/JavaLangAccess",
-                        "addExports",
-                        "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V",
-                        true
-                );
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 4);
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 2);
+                methodVisitor.visitLdcInsn("java.lang.invoke");
+                methodVisitor.visitVarInsn(Opcodes.ALOAD, 3);
+                methodVisitor.visitMethodInsn(Opcodes.INVOKEINTERFACE, "jdk/internal/access/JavaLangAccess", "addOpens", "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V", true);
 
                 Label label8 = new Label();
                 methodVisitor.visitLabel(label8);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        3
-                );
+                methodVisitor.visitInsn(Opcodes.RETURN);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        1
-                );
+                methodVisitor.visitLocalVariable("injectorClass", "Ljava/lang/Class;", "Ljava/lang/Class<*>;", label1, label8, 0);
+                methodVisitor.visitLocalVariable("loaderClass", "Ljava/lang/Class;", "Ljava/lang/Class<*>;", label2, label8, 1);
+                methodVisitor.visitLocalVariable("javaBaseModule", "Ljava/lang/Module;", null, label3, label8, 2);
+                methodVisitor.visitLocalVariable("loaderModule", "Ljava/lang/Module;", null, label4, label8, 3);
+                methodVisitor.visitLocalVariable("javaLangAccess", "Ljdk/internal/access/JavaLangAccess;", null, label5, label8, 4);
 
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        2
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEINTERFACE,
-                        "jdk/internal/access/JavaLangAccess",
-                        "addReads",
-                        "(Ljava/lang/Module;Ljava/lang/Module;)V",
-                        true
-                );
-
-                Label label9 = new Label();
-                methodVisitor.visitLabel(label9);
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        3
-                );
-
-                methodVisitor.visitLdcInsn(
-                        Type.getType("Ljava/lang/Object;")
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEVIRTUAL,
-                        "java/lang/Class",
-                        "getModule",
-                        "()Ljava/lang/Module;",
-                        false
-                );
-
-                methodVisitor.visitLdcInsn(
-                        "java.lang.invoke"
-                );
-
-                methodVisitor.visitVarInsn(
-                        Opcodes.ALOAD,
-                        2
-                );
-
-                methodVisitor.visitMethodInsn(
-                        Opcodes.INVOKEINTERFACE,
-                        "jdk/internal/access/JavaLangAccess",
-                        "addOpens",
-                        "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V",
-                        true
-                );
-
-                Label label10 = new Label();
-                methodVisitor.visitLabel(label10);
-
-                methodVisitor.visitInsn(
-                        Opcodes.RETURN
-                );
-
-                methodVisitor.visitLocalVariable(
-                        "injectorClass",
-                        "Ljava/lang/Class;",
-                        "Ljava/lang/Class<*>;",
-                        label1,
-                        label10,
-                        0
-                );
-
-                methodVisitor.visitLocalVariable(
-                        "proxyModule",
-                        "Ljava/lang/Module;",
-                        null,
-                        label2,
-                        label10,
-                        1
-                );
-
-                methodVisitor.visitLocalVariable(
-                        "mainModule",
-                        "Ljava/lang/Module;",
-                        null,
-                        label3,
-                        label10,
-                        2
-                );
-
-                methodVisitor.visitLocalVariable(
-                        "javaLangAccess",
-                        "Ljdk/internal/access/JavaLangAccess;",
-                        null,
-                        label6,
-                        label10,
-                        3
-                );
-
-                methodVisitor.visitMaxs(4, 4);
-
+                methodVisitor.visitMaxs(4, 5);
                 methodVisitor.visitEnd();
             }
             classWriter.visitEnd();
