@@ -759,7 +759,8 @@ public final class ReflectionUtils {
         }
     }
 
-    @SuppressWarnings("Java9ReflectionClassVisibility") // Somewhat ironically, this method is what allows us to bypass the same restriction that causes the warning
+    @SuppressWarnings("Java9ReflectionClassVisibility")
+    // Somewhat ironically, this method is what allows us to bypass the same restriction that causes the warning
     private static void bypassJigsaw() {
         final String javaLangAccessName = "jdk.internal.access.JavaLangAccess";
         final Class<?> javaLangAccessInterface;
@@ -772,7 +773,7 @@ public final class ReflectionUtils {
             //noinspection SuspiciousInvocationHandlerImplementation
             final Object proxyInstance = Proxy.newProxyInstance(
                     injectorLoader,
-                    new Class[] {
+                    new Class[]{
                             javaLangAccessInterface
                     },
                     (proxy, method, arguments) -> null
@@ -1670,6 +1671,7 @@ public final class ReflectionUtils {
 
         /**
          * Generates an injector class inside the given package.
+         *
          * @param packageName The package the class should be generated in
          * @return the bytes of the generated class
          */
