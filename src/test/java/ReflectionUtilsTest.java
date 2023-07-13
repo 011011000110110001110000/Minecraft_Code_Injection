@@ -61,6 +61,29 @@ public class ReflectionUtilsTest {
     }
 
     @Test
+    void testMethodHandleCracking() {
+        class Test {
+            private final Object privateField;
+
+            Test() {
+                this.privateField = new Object();
+            }
+        }
+
+        Assertions.assertDoesNotThrow(
+                () -> {
+                    final Test testObject = new Test();
+                    final MethodHandle privateFieldGetter = ReflectionUtils.findGetter(Test.class, "privateField", Object.class);
+                    final Field privateFieldField = MethodHandles.reflectAs(Field.class, privateFieldGetter);
+
+                    privateFieldField.setAccessible(true);
+
+                    Assertions.assertEquals(privateFieldGetter.invoke(testObject), privateFieldField.get(testObject));
+                }
+        );
+    }
+
+    @Test
     void testGetter() {
         class Test {
             private final Object privateField;
