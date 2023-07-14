@@ -675,11 +675,6 @@ public final class ReflectionUtils {
         throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.class) + callerBlame);
     }
 
-    public enum MemberType {
-        FIELD,
-        METHOD
-    }
-
     /**
      * Helper class that holds a trusted {@link MethodHandles.Lookup} instance. <br>
      *
