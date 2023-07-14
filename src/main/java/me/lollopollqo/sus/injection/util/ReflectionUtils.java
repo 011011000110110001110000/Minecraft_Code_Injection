@@ -1,5 +1,6 @@
 package me.lollopollqo.sus.injection.util;
 
+import jdk.internal.access.JavaLangAccess;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.*;
@@ -10,11 +11,12 @@ import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * <b>WIP</b> <br>
  * TODO: documentation, more helpers for internal methods, disabling reflection filters <br>
- * Utility class that contains some useful methods for easier / more powerful reflection usage. <br>
+ * A collection of hacks for easier / enhanced usage of the reflection and invocation APIs. <br>
  *
  * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
  */
@@ -25,53 +27,12 @@ public final class ReflectionUtils {
      */
     private static final StackWalker STACK_WALKER;
 
-    private static final MethodHandle fieldFilterMapGetter;
-    private static final MethodHandle methodFilterMapGetter;
-
-    private static final MethodHandle fieldFilterMapSetter;
-    private static final MethodHandle methodFilterMapSetter;
-
-    private static boolean initializing;
-
     static {
-
-        initializing = true;
 
         STACK_WALKER = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
-        bypassJigsaw();
-
-        final String reflectionClassName = "jdk.internal.reflect.Reflection";
-        final Class<?> reflectionClass;
-
-        try {
-            // noinspection Java9ReflectionClassVisibility
-            reflectionClass = Class.forName(reflectionClassName);
-        } catch (ReflectiveOperationException roe) {
-            throw new RuntimeException(roe);
-        }
-
-        // Ensure UnsafeHelper's initializer is invoked before the other Helper classes' ones by accessing a static member.
-        // We do it this way instead of using  Class.forName(String) so we can check for illegal initializations from outside this class in the UnsafeHelper initializer
-        // (and also to avoid having a hardcoded string with the fully qualified class name in case this ever gets relocated).
-        // This is essential to avoid an access violation error happening due to incorrect classloading order.
-        sun.misc.Unsafe unsafe = UnsafeHelper.UNSAFE;
-
-        // Handle this here to ensure it only happens after all the necessary initialization steps have happened
-        ModuleHelper.getSpecialModules();
-
-        try {
-            fieldFilterMapGetter = MethodHandleHelper.findStaticGetter(reflectionClass, "fieldFilterMap", Map.class);
-            methodFilterMapGetter = MethodHandleHelper.findStaticGetter(reflectionClass, "methodFilterMap", Map.class);
-
-            fieldFilterMapSetter = MethodHandleHelper.findStaticSetter(reflectionClass, "fieldFilterMap", Map.class);
-            methodFilterMapSetter = MethodHandleHelper.findStaticSetter(reflectionClass, "methodFilterMap", Map.class);
-        } catch (ReflectiveOperationException roe) {
-            throw new RuntimeException(roe);
-        }
-
-        initializing = false;
-
+        // ModuleHelper needs to be initialized before the other helper classes
+        ModuleHelper.bootstrap();
     }
 
     /**
@@ -83,10 +44,11 @@ public final class ReflectionUtils {
      * @return the method with the specified owner, name and parameter types
      * @throws NoSuchMethodException if a field with the specified name and parameter types could not be found in the specified class
      * @implNote This method still has the same restrictions as {@link Class#getDeclaredMethod(String, Class[])} in regard to what methods it can find (see {@link jdk.internal.reflect.Reflection#registerMethodsToFilter}).
+     * @see #unsafeSetAccessible(AccessibleObject, boolean)
      */
-    public static Method forceGetDeclaredMethod(Class<?> owner, String name, Class<?>... paramTypes) throws NoSuchMethodException {
+    public static Method forceGetDeclaredMethodWithUnsafe(Class<?> owner, String name, Class<?>... paramTypes) throws NoSuchMethodException {
         Method method = owner.getDeclaredMethod(name, paramTypes);
-        forceSetAccessibleWithUnsafe(method, true);
+        unsafeSetAccessible(method, true);
         return method;
     }
 
@@ -98,16 +60,18 @@ public final class ReflectionUtils {
      * @return the field with the specified owner and name
      * @throws NoSuchFieldException if a field with the specified name could not be found in the specified class
      * @implNote This method still has the same restrictions as {@link Class#getDeclaredField(String)} in regard to what fields it can find (see {@link jdk.internal.reflect.Reflection#registerFieldsToFilter}).
+     * @see #forceGetDeclaredFieldWithUnsafe(Class, int, Class)
+     * @see #unsafeSetAccessible(AccessibleObject, boolean)
      */
-    public static Field forceGetDeclaredField(Class<?> owner, String name) throws NoSuchFieldException {
+    public static Field forceGetDeclaredFieldWithUnsafe(Class<?> owner, String name) throws NoSuchFieldException {
         Field field = owner.getDeclaredField(name);
-        forceSetAccessibleWithUnsafe(field, true);
+        unsafeSetAccessible(field, true);
         return field;
     }
 
     /**
      * Gets a field with the specified type and access modifiers and forces it to be accessible. <br>
-     * Use this instead of {@link #forceGetDeclaredField(Class, String)} if the field name is not known. <br>
+     * Use this instead of {@link #forceGetDeclaredFieldWithUnsafe(Class, String)} if the field name is not known. <br>
      * If there is more than one field with the specified modifiers and type in the target class, <br>
      * then this method will return the first field with the specified modifiers and type it can find in the target class. <br>
      * The order in which fields are checked is determined by {@link Class#getDeclaredFields()}.
@@ -118,11 +82,13 @@ public final class ReflectionUtils {
      * @return the field with the specified owner, access modifiers and type
      * @throws NoSuchFieldException if a field with the specified type and modifiers could not be found in the specified class
      * @implNote This method still has the same restrictions as {@link Class#getDeclaredFields()} in regard to what fields it can find (see {@link jdk.internal.reflect.Reflection#registerFieldsToFilter}).
+     * @see #forceGetDeclaredFieldWithUnsafe(Class, String)
+     * @see #unsafeSetAccessible(AccessibleObject, boolean)
      */
-    public static Field forceGetDeclaredField(Class<?> owner, int modifiers, Class<?> type) throws NoSuchFieldException {
+    public static Field forceGetDeclaredFieldWithUnsafe(Class<?> owner, int modifiers, Class<?> type) throws NoSuchFieldException {
         for (Field field : owner.getDeclaredFields()) {
             if (field.getModifiers() == modifiers && field.getType() == type) {
-                forceSetAccessibleWithUnsafe(field, true);
+                unsafeSetAccessible(field, true);
                 return field;
             }
         }
@@ -130,29 +96,18 @@ public final class ReflectionUtils {
     }
 
     /**
-     * Forces the given {@link AccessibleObject} instance to have the desired accessibility.
-     *
-     * @param object     The object whose accessibility is to be forcefully set
-     * @param accessible The accessibility to be forcefully set
-     */
-    @SuppressWarnings("SameParameterValue")
-    private static void forceSetAccessibleWithUnsafe(AccessibleObject object, boolean accessible) {
-        unsafeSetAccessible(object, accessible);
-    }
-
-    /**
-     * Forces the given {@link AccessibleObject} instance to have the desired accessibility. <br>
+     * Forces the given {@link AccessibleObject} instance to have the desired accessibility by using {@link UnsafeHelper#unsafeSetAccessible(AccessibleObject, boolean)}. <br>
      * Unlike {@link AccessibleObject#setAccessible(boolean)}, this method does not perform any permission checks.
      *
      * @param object     The object whose accessibility is to be forcefully set
      * @param accessible The accessibility to be forcefully set
      * @return <code>accessible</code>
-     * @see UnsafeHelper#unsafeSetAccesible(AccessibleObject, boolean)
+     * @see UnsafeHelper#unsafeSetAccessible(AccessibleObject, boolean)
      */
     @SuppressWarnings("UnusedReturnValue")
     public static boolean unsafeSetAccessible(AccessibleObject object, boolean accessible) {
         try {
-            UnsafeHelper.unsafeSetAccesible(object, accessible);
+            UnsafeHelper.unsafeSetAccessible(object, accessible);
             return accessible;
         } catch (Throwable e) {
             throw new RuntimeException("Could not force the accessibility of " + object + " to be set to " + accessible, e);
@@ -707,94 +662,13 @@ public final class ReflectionUtils {
         return clazz.getModule().getName() + '/' + clazz.getName();
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<Class<?>, Set<String>> removeReflectionFilters(MemberType memberType) {
-        try {
-            final Map<Class<?>, Set<String>> filterMap;
-            final Map<Class<?>, Set<String>> originalFilterMap;
-            final MethodHandle getter;
-            final MethodHandle setter;
-
-            switch (memberType) {
-                case FIELD -> {
-                    getter = fieldFilterMapGetter;
-                    setter = fieldFilterMapSetter;
-                }
-                case METHOD -> {
-                    getter = methodFilterMapGetter;
-                    setter = methodFilterMapSetter;
-                }
-                default -> throw new IllegalArgumentException("Unknown member type: " + memberType);
-            }
-
-            filterMap = (Map<Class<?>, Set<String>>) getter.invoke();
-            originalFilterMap = Map.copyOf(filterMap);
-            setter.invoke(Map.of());
-            return originalFilterMap;
-
-        } catch (Throwable t) {
-            throw new RuntimeException(t);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    public static Map<Class<?>, Set<String>> removeFieldReflectionFiltersForClass(Class<?> clazz) throws Throwable {
-        final Map<Class<?>, Set<String>> fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapGetter.invoke();
-        final Map<Class<?>, Set<String>> original = Map.copyOf(fieldFilterMap);
-        final Map<Class<?>, Set<String>> newFilterMap = new HashMap<>(fieldFilterMap);
-        newFilterMap.remove(clazz);
-        fieldFilterMapSetter.invoke(newFilterMap);
-        return original;
-    }
-
-    private static void setReflectionFilters(MemberType memberType, Map<Class<?>, Set<String>> filterMap) {
-        try {
-            switch (memberType) {
-                case FIELD -> fieldFilterMapSetter.invoke(filterMap);
-                case METHOD -> methodFilterMapSetter.invoke(filterMap);
-                default -> throw new IllegalArgumentException("Unknown member type: " + memberType);
-            }
-        } catch (Throwable t) {
-            throw new RuntimeException(t);
-        }
-    }
-
-    @SuppressWarnings("Java9ReflectionClassVisibility")
-    // Somewhat ironically, this method is what allows us to bypass the same restriction that causes the warning
-    private static void bypassJigsaw() {
-        final String javaLangAccessName = "jdk.internal.access.JavaLangAccess";
-        final Class<?> javaLangAccessInterface;
-        final Class<?> injectorClass;
-        final InjectorClassLoader injectorLoader = new InjectorClassLoader();
-
-        try {
-            javaLangAccessInterface = Class.forName(javaLangAccessName);
-
-            //noinspection SuspiciousInvocationHandlerImplementation
-            final Object proxyInstance = Proxy.newProxyInstance(
-                    injectorLoader,
-                    new Class[]{
-                            javaLangAccessInterface
-                    },
-                    (proxy, method, arguments) -> null
-            );
-
-            final String packageName = proxyInstance.getClass().getPackageName().replace(".", "/");
-
-            injectorClass = injectorLoader.defineAndLoad(InjectorGenerator.generateIn(packageName));
-
-        } catch (ReflectiveOperationException roe) {
-            throw new RuntimeException("Could not bypass the module system", roe);
-        }
-    }
-
     /**
      * Private constructor to prevent instantiation.
      */
     private ReflectionUtils() {
         String callerBlame = "";
         try {
-            callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+            callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
         } catch (IllegalCallerException ignored) {
 
         }
@@ -819,22 +693,8 @@ public final class ReflectionUtils {
         private static final MethodHandles.Lookup LOOKUP;
 
         static {
-            // Don't allow initialization externally
-            {
-                final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$ModuleHelper");
-                Class<?> caller;
 
-                try {
-                    caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
-                } catch (IllegalCallerException ice) {
-                    illegalCaller.addSuppressed(ice);
-                    throw illegalCaller;
-                }
-
-                if (caller != ReflectionUtils.ModuleHelper.class) {
-                    throw illegalCaller;
-                }
-            }
+            ModuleHelper.addOpens(Object.class.getModule(), "java.lang.invoke", LookupHelper.class.getModule());
 
             LOOKUP = getTrustedLookup();
         }
@@ -861,7 +721,7 @@ public final class ReflectionUtils {
                 try {
                     // Get the trusted lookup via reflection
                     final Field implLookupField = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
-                    UnsafeHelper.unsafeSetAccesible(implLookupField, true);
+                    UnsafeHelper.unsafeSetAccessible(implLookupField, true);
                     implLookup = (MethodHandles.Lookup) implLookupField.get(null);
 
                 } catch (ReflectiveOperationException roe) {
@@ -872,7 +732,7 @@ public final class ReflectionUtils {
                     final int trusted = -1;
                     final Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
 
-                    UnsafeHelper.unsafeSetAccesible(lookupConstructor, true);
+                    UnsafeHelper.unsafeSetAccessible(lookupConstructor, true);
                     implLookup = lookupConstructor.newInstance(Object.class, null, trusted);
                 }
             } catch (ReflectiveOperationException roe) {
@@ -888,7 +748,7 @@ public final class ReflectionUtils {
         private LookupHelper() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
@@ -1048,7 +908,7 @@ public final class ReflectionUtils {
         private MethodHandleHelper() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
@@ -1216,7 +1076,7 @@ public final class ReflectionUtils {
         private VarHandleHelper() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
@@ -1232,64 +1092,54 @@ public final class ReflectionUtils {
      */
     private static final class ModuleHelper {
         /**
-         * An instance of {@link ModuleLayer.Controller}, used to export / open packages without restrictions
-         *
-         * @see #unsafeAddExports(Module, String, Module)
-         * @see #unsafeAddExportsToAllUnnamed(Module, String)
-         * @see #unsafeAddExports(Module, String)
-         * @see #unsafeAddOpens(Module, String, Module)
-         * @see #unsafeAddOpensToAllUnnamed(Module, String)
-         * @see #unsafeAddOpens(Module, String)
+         * Special module that represents all unnamed modules (see {@link Module#ALL_UNNAMED_MODULE})
          */
-        private static final ModuleLayer.Controller layerController;
+        private static final Module ALL_UNNAMED_MODULE;
         /**
-         * The cached offset (in bytes) for the {@link ModuleLayer.Controller#layer} field in a {@link ModuleLayer.Controller} instance
-         *
-         * @see #layerController
-         * @see #unsafeAddExports(Module, String, Module)
-         * @see #unsafeAddExportsToAllUnnamed(Module, String)
-         * @see #unsafeAddExports(Module, String)
-         * @see #unsafeAddOpens(Module, String, Module)
-         * @see #unsafeAddOpensToAllUnnamed(Module, String)
-         * @see #unsafeAddOpens(Module, String)
+         * Special module that represents all modules (see {@link Module#EVERYONE_MODULE})
          */
-        private static final long layerFieldOffset;
+        private static final Module EVERYONE_MODULE;
         /**
-         * Special module that represents all unnamed modules (see {@link Module#ALL_UNNAMED_MODULE}) <br>
+         * Cached constructor for the {@link ModuleLayer.Controller} class
          *
-         * @implNote Cannot be final due to classloading ordering issues
+         * @see #LAYER_CONTROLLER_FACTORY
          */
-        private static Module allUnnamedModule;
+        private static final Constructor<ModuleLayer.Controller> LAYER_CONTROLLER_CONSTRUCTOR;
         /**
-         * Special module that represents all modules (see {@link Module#EVERYONE_MODULE}) <br>
-         *
-         * @implNote Cannot be final due to classloading ordering issues
+         * Internal factory object for obtaining instances of {@link ModuleLayer.Controller}
          */
-        private static Module everyoneModule;
+        private static final Function<Module, ModuleLayer.Controller> LAYER_CONTROLLER_FACTORY;
+        private static final JavaLangAccess JAVA_LANG_ACCESS;
 
         static {
-            // Don't allow initialization externally
-            {
-                final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$ModuleHelper#<clinit> invoked from outside ReflectionUtils$UnsafeHelper");
-                final Class<?> caller;
 
-                try {
-                    caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
-                } catch (IllegalCallerException ice) {
-                    illegalCaller.addSuppressed(ice);
-                    throw illegalCaller;
-                }
+            gainInternalAccess();
 
-                if (caller != UnsafeHelper.class) {
-                    throw illegalCaller;
-                }
-            }
+            JAVA_LANG_ACCESS = jdk.internal.access.SharedSecrets.getJavaLangAccess();
+
+            // Open the java.lang package to this class' module so we can use AccessibleObject#setAccessible(boolean) on the ModuleLayer.Controller constructor
+            addOpens(ModuleLayer.Controller.class.getModule(), ModuleLayer.Controller.class.getPackageName(), ModuleHelper.class.getModule());
 
             try {
-                layerController = (ModuleLayer.Controller) UnsafeHelper.UNSAFE.allocateInstance(ModuleLayer.Controller.class);
-                layerFieldOffset = UnsafeHelper.UNSAFE.objectFieldOffset(ModuleLayer.Controller.class.getDeclaredField("layer"));
+                LAYER_CONTROLLER_CONSTRUCTOR = ModuleLayer.Controller.class.getDeclaredConstructor(ModuleLayer.class);
+                LAYER_CONTROLLER_CONSTRUCTOR.setAccessible(true);
+            } catch (NoSuchMethodException nsme) {
+                throw new RuntimeException("Could not find constructor for " + getModuleInclusiveClassName(ModuleLayer.Controller.class), nsme);
+            }
+
+            LAYER_CONTROLLER_FACTORY = module -> {
+                try {
+                    return LAYER_CONTROLLER_CONSTRUCTOR.newInstance(module.getLayer());
+                } catch (ReflectiveOperationException roe) {
+                    throw new RuntimeException("Could not create a new instance of " + getModuleInclusiveClassName(ModuleLayer.Controller.class), roe);
+                }
+            };
+
+            try {
+                ALL_UNNAMED_MODULE = (Module) LookupHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "ALL_UNNAMED_MODULE", Module.class).invoke();
+                EVERYONE_MODULE = (Module) LookupHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "EVERYONE_MODULE", Module.class).invoke();
             } catch (Throwable t) {
-                throw new RuntimeException(t);
+                throw new RuntimeException("Could not find special module instances", t);
             }
         }
 
@@ -1301,7 +1151,7 @@ public final class ReflectionUtils {
          * @param target      The module the package is to be exported to
          */
         private static void addExports(Module source, String packageName, Module target) {
-            jdk.internal.access.SharedSecrets.getJavaLangAccess().addExports(source, packageName, target);
+            JAVA_LANG_ACCESS.addExports(source, packageName, target);
         }
 
         /**
@@ -1311,7 +1161,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addExportsToAllUnnamed(Module source, String packageName) {
-            jdk.internal.access.SharedSecrets.getJavaLangAccess().addExportsToAllUnnamed(source, packageName);
+            JAVA_LANG_ACCESS.addExportsToAllUnnamed(source, packageName);
         }
 
         /**
@@ -1321,7 +1171,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addExports(Module source, String packageName) {
-            jdk.internal.access.SharedSecrets.getJavaLangAccess().addExports(source, packageName);
+            JAVA_LANG_ACCESS.addExports(source, packageName);
         }
 
         /**
@@ -1332,7 +1182,7 @@ public final class ReflectionUtils {
          * @param target      The module the package is to be opened to
          */
         private static void addOpens(Module source, String packageName, Module target) {
-            jdk.internal.access.SharedSecrets.getJavaLangAccess().addOpens(source, packageName, target);
+            JAVA_LANG_ACCESS.addOpens(source, packageName, target);
         }
 
         /**
@@ -1342,7 +1192,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addOpensToAllUnnamed(Module source, String packageName) {
-            jdk.internal.access.SharedSecrets.getJavaLangAccess().addOpensToAllUnnamed(source, packageName);
+            JAVA_LANG_ACCESS.addOpensToAllUnnamed(source, packageName);
         }
 
         /**
@@ -1351,102 +1201,115 @@ public final class ReflectionUtils {
          * @param source      The module the package belongs to
          * @param packageName The name of the package
          * @implNote Since {@link jdk.internal.access.JavaLangAccess} does not expose any methods to unconditionally open a package to all modules,
-         * we use the special {@link #everyoneModule} instance as if it was any other normal module
+         * we use the special {@link #EVERYONE_MODULE} instance as if it was any other normal module
          */
         private static void addOpens(Module source, String packageName) {
-            addOpens(source, packageName, everyoneModule);
+            addOpens(source, packageName, EVERYONE_MODULE);
         }
 
         /**
-         * Exports the specified package from the specified module to the specified module using {@link sun.misc.Unsafe}.
+         * Exports the specified package from the specified module to the specified module using an instance of {@link ModuleLayer.Controller}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
          * @param target      The module the package is to be exported to
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used
          */
-        private static void unsafeAddExports(Module source, String packageName, Module target) {
-            UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
-            layerController.addExports(source, packageName, target);
+        private static ModuleLayer.Controller addExportsWithController(Module source, String packageName, Module target) {
+            return LAYER_CONTROLLER_FACTORY.apply(source).addExports(source, packageName, target);
         }
 
         /**
-         * Exports the specified package from the specified module to all unnamed modules using {@link sun.misc.Unsafe}.
+         * Exports the specified package from the specified module to all unnamed modules using an instance of {@link ModuleLayer.Controller}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used
          */
-        private static void unsafeAddExportsToAllUnnamed(Module source, String packageName) {
-            unsafeAddExports(source, packageName, allUnnamedModule);
+        private static ModuleLayer.Controller addExportsToAllUnnamedWithController(Module source, String packageName) {
+            return addExportsWithController(source, packageName, ALL_UNNAMED_MODULE);
         }
 
         /**
-         * Exports the specified package from the specified module to all modules using {@link sun.misc.Unsafe}.
+         * Exports the specified package from the specified module to all modules using an instance of {@link ModuleLayer.Controller}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used
          */
-        private static void unsafeAddExports(Module source, String packageName) {
-            unsafeAddExports(source, packageName, everyoneModule);
+        private static ModuleLayer.Controller addExportsWithController(Module source, String packageName) {
+            return addExportsWithController(source, packageName, EVERYONE_MODULE);
         }
 
         /**
-         * Opens the specified package from the specified module to the specified module using {@link sun.misc.Unsafe}.
+         * Opens the specified package from the specified module to the specified module using an instance of {@link ModuleLayer.Controller}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
          * @param target      The module the package is to be opened to
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used
          */
-        private static void unsafeAddOpens(Module source, String packageName, Module target) {
-            UnsafeHelper.UNSAFE.putObject(layerController, layerFieldOffset, source.getLayer());
-            layerController.addOpens(source, packageName, target);
+        private static ModuleLayer.Controller addOpensWithController(Module source, String packageName, Module target) {
+            return LAYER_CONTROLLER_FACTORY.apply(source).addOpens(source, packageName, target);
         }
 
         /**
-         * Opens the specified package from the specified module to all unnamed modules using {@link sun.misc.Unsafe}.
+         * Opens the specified package from the specified module to all unnamed modules using an instance of {@link ModuleLayer.Controller}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used
          */
-        private static void unsafeAddOpensToAllUnnamed(Module source, String packageName) {
-            unsafeAddOpens(source, packageName, allUnnamedModule);
+        private static ModuleLayer.Controller addOpensToAllUnnamedWithController(Module source, String packageName) {
+            return addOpensWithController(source, packageName, ALL_UNNAMED_MODULE);
         }
 
         /**
-         * Opens the specified package from the specified module to all modules using {@link sun.misc.Unsafe}.
+         * Opens the specified package from the specified module to all modules using an instance of {@link ModuleLayer.Controller}.
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used
          */
-        private static void unsafeAddOpens(Module source, String packageName) {
-            unsafeAddOpens(source, packageName, everyoneModule);
+        private static ModuleLayer.Controller addOpensWithController(Module source, String packageName) {
+            return addOpensWithController(source, packageName, EVERYONE_MODULE);
         }
 
         /**
-         * Sets the references to {@link Module#ALL_UNNAMED_MODULE} and {@link Module#EVERYONE_MODULE}.
-         *
-         * @see #allUnnamedModule
-         * @see #everyoneModule
+         * This method is only used to trigger classloading for this class, it does nothing on its own.
          */
-        private static void getSpecialModules() {
-            final boolean allUnnamedIsPresent = allUnnamedModule != null;
-            final boolean everyoneIsPresent = everyoneModule != null;
+        private static void bootstrap() {
+            // NOOP
+        }
 
-            // If the references are already set, return early
-            if (allUnnamedIsPresent && everyoneIsPresent) {
-                return;
-            }
+        /**
+         * Exploits the Proxy API to gain access to the {@link jdk.internal.access} package,
+         * which is normally restricted for classes outside the {@code java.base} module.
+         */
+        @SuppressWarnings({"Java9ReflectionClassVisibility", "SuspiciousInvocationHandlerImplementation"})
+        private static void gainInternalAccess() {
+            final String javaLangAccessName = "jdk.internal.access.JavaLangAccess";
+            final Class<?> javaLangAccessInterface;
+            final Class<?> injectorClass;
+            final InjectorClassLoader injectorLoader = new InjectorClassLoader();
 
-            // If only one reference is not null it means something went really wrong, so throw an exception
-            if (allUnnamedIsPresent ^ everyoneIsPresent) {
-                throw new IllegalStateException("Expected both allUnnamedModule and everyoneModule to be non null, but only " + (allUnnamedIsPresent ? "everyoneModule" : "allUnnamedModule") + " is not null!");
-            }
-
-            // If both references are null, then we can proceed
             try {
-                allUnnamedModule = (Module) LookupHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "ALL_UNNAMED_MODULE", Module.class).invoke();
-                everyoneModule = (Module) LookupHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "EVERYONE_MODULE", Module.class).invoke();
-            } catch (Throwable t) {
-                throw new RuntimeException("Could not find special module instances!", t);
+                javaLangAccessInterface = Class.forName(javaLangAccessName);
+
+                final Object proxyInstance = Proxy.newProxyInstance(
+                        injectorLoader,
+                        new Class[]{
+                                javaLangAccessInterface
+                        },
+                        (proxy, method, arguments) -> null
+                );
+
+                final String packageName = proxyInstance.getClass().getPackageName().replace(".", "/");
+
+                injectorLoader.defineAndLoad(InjectorGenerator.generateIn(packageName));
+
+            } catch (ReflectiveOperationException roe) {
+                throw new RuntimeException("Could not gain access to ", roe);
             }
         }
 
@@ -1456,12 +1319,13 @@ public final class ReflectionUtils {
         private ModuleHelper() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
             throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.ModuleHelper.class) + callerBlame);
         }
+
     }
 
     /**
@@ -1482,32 +1346,17 @@ public final class ReflectionUtils {
         /**
          * The cached offset (in bytes) of the {@link AccessibleObject#override} field in an {@link AccessibleObject} instance
          */
-        private static final long overrideOffset;
+        private static final long OVERRIDE_OFFSET;
 
         static {
-            // Don't allow initialization externally
-            {
-                final IllegalCallerException illegalCaller = new IllegalCallerException("ReflectionUtils$UnsafeHelper#<clinit> invoked from outside ReflectionUtils");
-                final Class<?> caller;
 
-                try {
-                    caller = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass();
-                } catch (IllegalCallerException ice) {
-                    illegalCaller.addSuppressed(ice);
-                    throw illegalCaller;
-                }
+            ModuleHelper.addExports(Object.class.getModule(), "jdk.internal.misc", UnsafeHelper.class.getModule());
 
-                if (caller != ReflectionUtils.class) {
-                    throw illegalCaller;
-                }
-            }
-
-            // Needs to be done before calling enableJdkInternalsAccess() as that uses methods in ModuleHelper, which in turn use the sun.misc.Unsafe instance
             UNSAFE = findUnsafe();
-            enableJdkInternalsAccess();
             INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
+
             // Bypass reflection filters by using the jdk.internal.misc.Unsafe instance
-            overrideOffset = INTERNAL_UNSAFE.objectFieldOffset(AccessibleObject.class, "override");
+            OVERRIDE_OFFSET = INTERNAL_UNSAFE.objectFieldOffset(AccessibleObject.class, "override");
         }
 
         /**
@@ -1519,8 +1368,8 @@ public final class ReflectionUtils {
          * @implNote As the name of the method suggests, this makes use of {@link jdk.internal.misc.Unsafe} to bypass any access checks.
          */
         @SuppressWarnings("SameParameterValue")
-        private static void unsafeSetAccesible(AccessibleObject object, boolean accessible) {
-            INTERNAL_UNSAFE.putBoolean(object, overrideOffset, accessible);
+        private static void unsafeSetAccessible(AccessibleObject object, boolean accessible) {
+            INTERNAL_UNSAFE.putBoolean(object, OVERRIDE_OFFSET, accessible);
         }
 
         /**
@@ -1529,20 +1378,20 @@ public final class ReflectionUtils {
          * @return the {@link sun.misc.Unsafe} instance
          */
         private static sun.misc.Unsafe findUnsafe() {
-            final int unsafeModifiers = Modifier.STATIC | Modifier.FINAL;
+            final int unsafeFieldModifiers = Modifier.STATIC | Modifier.FINAL;
             final List<Throwable> exceptions = new ArrayList<>();
 
-            // We cannot rely on the field name, as it is an implementation detail and as such it can be different from version to version
+            // We cannot rely on the field name, as it is an implementation detail and as such it can be different from vendor to vendor
             for (Field field : sun.misc.Unsafe.class.getDeclaredFields()) {
 
                 // Verify that the field is of the correct type and has the correct access modifiers
-                if (field.getType() != sun.misc.Unsafe.class || (field.getModifiers() & unsafeModifiers) != unsafeModifiers) {
+                if (field.getType() != sun.misc.Unsafe.class || (field.getModifiers() & unsafeFieldModifiers) != unsafeFieldModifiers) {
                     continue;
                 }
 
                 try {
-                    // Thankfully don't need to do anything fancy to set the field to be accessible
-                    // since the jdk.unsupported module exports and opens the sun.misc package to all modules
+                    // We don't need to do anything fancy to set the field to be accessible
+                    // since the jdk.unsupported module opens the sun.misc package to all modules
                     field.setAccessible(true);
                     if (field.get(null) instanceof sun.misc.Unsafe unsafe) {
                         return unsafe;
@@ -1556,26 +1405,6 @@ public final class ReflectionUtils {
             final RuntimeException exception = new RuntimeException("Could not find sun.misc.Unsafe instance!");
             exceptions.forEach(exception::addSuppressed);
             throw exception;
-        }
-
-        /**
-         * Exports the {@link jdk.internal.misc}, {@link jdk.internal.access} and {@link jdk.internal.reflect} packages to this class' module.
-         */
-        private static void enableJdkInternalsAccess() {
-            if (UNSAFE == null) {
-                throw new IllegalStateException(ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.UnsafeHelper.class) + "#enableJdkInternalsAccess() called before sun.misc.Unsafe instance could be obtained!");
-            }
-
-            final String internalPackageName = "jdk.internal";
-            final String miscPackageName = internalPackageName + ".misc";
-            final String accessPackageName = internalPackageName + ".access";
-            final String reflectPackageName = internalPackageName + ".reflect";
-            final Module javaBaseModule = Object.class.getModule();
-
-            // Need to use the unsafe version here as we obviously haven't gained access to the classes in the jdk.internal.access package (SharedSecrets, JavaLangAccess) yet
-            ModuleHelper.unsafeAddExports(javaBaseModule, miscPackageName, UnsafeHelper.class.getModule());
-            ModuleHelper.unsafeAddExports(javaBaseModule, accessPackageName, UnsafeHelper.class.getModule());
-            ModuleHelper.unsafeAddExports(javaBaseModule, reflectPackageName, UnsafeHelper.class.getModule());
         }
 
         /**
@@ -1602,7 +1431,7 @@ public final class ReflectionUtils {
         private UnsafeHelper() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE).getCallerClass());
+                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
@@ -1624,10 +1453,10 @@ public final class ReflectionUtils {
             return defineClass(null, data, 0, data.length, null);
         }
 
+        @SuppressWarnings("UnusedReturnValue")
         Class<?> defineAndLoad(byte[] data) throws ClassNotFoundException {
             return Class.forName(define(data).getName(), true, this);
         }
-
     }
 
     /**
@@ -1639,24 +1468,15 @@ public final class ReflectionUtils {
      *     static {
      *         final Class<?> injectorClass = Injector.class;
      *         final Class<?> loaderClass = injectorClass.getClassLoader().getClass();
-     *
      *         final Module javaBaseModule = Object.class.getModule();
      *         final Module loaderModule = loaderClass.getModule();
-     *
      *         // Obtain the jdk.internal.access.JavaLangAccess instance via jdk.internal.access.SharedSecrets
      *         final jdk.internal.access.JavaLangAccess javaLangAccess = jdk.internal.access.SharedSecrets.getJavaLangAccess();
      *
-     *         // Export the jdk.internal.misc package to the loader module to enable jdk.internal.misc.Unsafe access
-     *         javaLangAccess.addExports(javaBaseModule, "jdk.internal.misc", loaderModule);
      *         // Export the jdk.internal.access package to the loader module to enable jdk.internal.access.JavaLangAccess access
      *         javaLangAccess.addExports(javaBaseModule, "jdk.internal.access", loaderModule);
-     *
-     *         // Open the java.lang.invoke package to the loader module to enable AccessibleObject#setAccessible(boolean) usage on members of the classes in the package
-     *         // This will be used to be able to invoke the MethodHandles.Lookup constructor directly
-     *         javaLangAccess.addOpens(javaBaseModule, "java.lang.invoke", loaderModule);
      *     }
      * }
-     *
      * }</pre></blockquote>
      * <p>
      * In conjunction with {@link InjectorClassLoader}, this is used to define and load a class inside a proxy module which has access to the {@link jdk.internal.access} package.
@@ -1694,21 +1514,46 @@ public final class ReflectionUtils {
 
             // Default constructor bytecode (<init>()V)
             {
-                methodVisitor = classWriter.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+                methodVisitor = classWriter.visitMethod(
+                        Opcodes.ACC_PUBLIC,
+                        "<init>",
+                        "()V",
+                        null,
+                        null
+                );
 
                 methodVisitor.visitCode();
 
                 Label label0 = new Label();
                 methodVisitor.visitLabel(label0);
 
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 0);
-                methodVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
-                methodVisitor.visitInsn(Opcodes.RETURN);
+                methodVisitor.visitVarInsn(
+                        Opcodes.ALOAD,
+                        0
+                );
+                methodVisitor.visitMethodInsn(
+                        Opcodes.INVOKESPECIAL,
+                        "java/lang/Object",
+                        "<init>",
+                        "()V",
+                        false
+                );
+                methodVisitor.visitInsn(
+                        Opcodes.RETURN
+                );
 
                 Label label1 = new Label();
                 methodVisitor.visitLabel(label1);
 
-                methodVisitor.visitLocalVariable("this", descriptor, null, label0, label1, 0);
+                methodVisitor.visitLocalVariable(
+                        "this",
+                        descriptor,
+                        null,
+                        label0,
+                        label1,
+                        0
+                );
+
                 methodVisitor.visitMaxs(1, 1);
 
                 methodVisitor.visitEnd();
@@ -1716,82 +1561,176 @@ public final class ReflectionUtils {
 
             // Static class initializer bytecode (<clinit>()V)
             {
-                methodVisitor = classWriter.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
+                methodVisitor = classWriter.visitMethod(
+                        Opcodes.ACC_STATIC,
+                        "<clinit>",
+                        "()V",
+                        null,
+                        null
+                );
 
                 methodVisitor.visitCode();
 
                 Label label0 = new Label();
                 methodVisitor.visitLabel(label0);
 
-                methodVisitor.visitLdcInsn(Type.getType(descriptor));
-                methodVisitor.visitVarInsn(Opcodes.ASTORE, 0);
+                methodVisitor.visitLdcInsn(
+                        Type.getType(descriptor)
+                );
+                methodVisitor.visitVarInsn(
+                        Opcodes.ASTORE,
+                        0
+                );
 
                 Label label1 = new Label();
                 methodVisitor.visitLabel(label1);
 
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 0);
-                methodVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Class", "getClassLoader", "()Ljava/lang/ClassLoader;", false);
-                methodVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false);
-                methodVisitor.visitVarInsn(Opcodes.ASTORE, 1);
+                methodVisitor.visitVarInsn(
+                        Opcodes.ALOAD,
+                        0
+                );
+                methodVisitor.visitMethodInsn(
+                        Opcodes.INVOKEVIRTUAL,
+                        "java/lang/Class",
+                        "getClassLoader",
+                        "()Ljava/lang/ClassLoader;",
+                        false
+                );
+                methodVisitor.visitMethodInsn(
+                        Opcodes.INVOKEVIRTUAL,
+                        "java/lang/Object",
+                        "getClass",
+                        "()Ljava/lang/Class;",
+                        false
+                );
+                methodVisitor.visitVarInsn(
+                        Opcodes.ASTORE, 1);
 
                 Label label2 = new Label();
                 methodVisitor.visitLabel(label2);
 
-                methodVisitor.visitLdcInsn(Type.getType("Ljava/lang/Object;"));
-                methodVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Class", "getModule", "()Ljava/lang/Module;", false);
-                methodVisitor.visitVarInsn(Opcodes.ASTORE, 2);
+                methodVisitor.visitLdcInsn(
+                        Type.getType("Ljava/lang/Object;")
+                );
+                methodVisitor.visitMethodInsn(
+                        Opcodes.INVOKEVIRTUAL,
+                        "java/lang/Class",
+                        "getModule",
+                        "()Ljava/lang/Module;",
+                        false
+                );
+                methodVisitor.visitVarInsn(
+                        Opcodes.ASTORE,
+                        2
+                );
 
                 Label label3 = new Label();
                 methodVisitor.visitLabel(label3);
 
-                methodVisitor.visitLineNumber(9, label3);
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 1);
-                methodVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Class", "getModule", "()Ljava/lang/Module;", false);
-                methodVisitor.visitVarInsn(Opcodes.ASTORE, 3);
+                methodVisitor.visitVarInsn(
+                        Opcodes.ALOAD,
+                        1
+                );
+                methodVisitor.visitMethodInsn(
+                        Opcodes.INVOKEVIRTUAL,
+                        "java/lang/Class",
+                        "getModule",
+                        "()Ljava/lang/Module;",
+                        false
+                );
+                methodVisitor.visitVarInsn(
+                        Opcodes.ASTORE,
+                        3
+                );
 
                 Label label4 = new Label();
                 methodVisitor.visitLabel(label4);
 
-                methodVisitor.visitMethodInsn(Opcodes.INVOKESTATIC, "jdk/internal/access/SharedSecrets", "getJavaLangAccess", "()Ljdk/internal/access/JavaLangAccess;", false);
-                methodVisitor.visitVarInsn(Opcodes.ASTORE, 4);
+                methodVisitor.visitMethodInsn(
+                        Opcodes.INVOKESTATIC,
+                        "jdk/internal/access/SharedSecrets",
+                        "getJavaLangAccess",
+                        "()Ljdk/internal/access/JavaLangAccess;",
+                        false
+                );
+                methodVisitor.visitVarInsn(
+                        Opcodes.ASTORE,
+                        4
+                );
 
                 Label label5 = new Label();
                 methodVisitor.visitLabel(label5);
 
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 4);
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 2);
-                methodVisitor.visitLdcInsn("jdk.internal.misc");
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 3);
-                methodVisitor.visitMethodInsn(Opcodes.INVOKEINTERFACE, "jdk/internal/access/JavaLangAccess", "addExports", "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V", true);
+                methodVisitor.visitVarInsn(
+                        Opcodes.ALOAD,
+                        4
+                );
+                methodVisitor.visitVarInsn(
+                        Opcodes.ALOAD,
+                        2
+                );
+                methodVisitor.visitLdcInsn(
+                        "jdk.internal.access"
+                );
+                methodVisitor.visitVarInsn(
+                        Opcodes.ALOAD,
+                        3
+                );
+                methodVisitor.visitMethodInsn(
+                        Opcodes.INVOKEINTERFACE,
+                        "jdk/internal/access/JavaLangAccess",
+                        "addExports",
+                        "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V",
+                        true
+                );
 
                 Label label6 = new Label();
                 methodVisitor.visitLabel(label6);
 
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 4);
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 2);
-                methodVisitor.visitLdcInsn("jdk.internal.access");
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 3);
-                methodVisitor.visitMethodInsn(Opcodes.INVOKEINTERFACE, "jdk/internal/access/JavaLangAccess", "addExports", "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V", true);
+                methodVisitor.visitInsn(
+                        Opcodes.RETURN
+                );
 
-                Label label7 = new Label();
-                methodVisitor.visitLabel(label7);
-
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 4);
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 2);
-                methodVisitor.visitLdcInsn("java.lang.invoke");
-                methodVisitor.visitVarInsn(Opcodes.ALOAD, 3);
-                methodVisitor.visitMethodInsn(Opcodes.INVOKEINTERFACE, "jdk/internal/access/JavaLangAccess", "addOpens", "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V", true);
-
-                Label label8 = new Label();
-                methodVisitor.visitLabel(label8);
-
-                methodVisitor.visitInsn(Opcodes.RETURN);
-
-                methodVisitor.visitLocalVariable("injectorClass", "Ljava/lang/Class;", "Ljava/lang/Class<*>;", label1, label8, 0);
-                methodVisitor.visitLocalVariable("loaderClass", "Ljava/lang/Class;", "Ljava/lang/Class<*>;", label2, label8, 1);
-                methodVisitor.visitLocalVariable("javaBaseModule", "Ljava/lang/Module;", null, label3, label8, 2);
-                methodVisitor.visitLocalVariable("loaderModule", "Ljava/lang/Module;", null, label4, label8, 3);
-                methodVisitor.visitLocalVariable("javaLangAccess", "Ljdk/internal/access/JavaLangAccess;", null, label5, label8, 4);
+                methodVisitor.visitLocalVariable(
+                        "injectorClass",
+                        "Ljava/lang/Class;",
+                        "Ljava/lang/Class<*>;",
+                        label1,
+                        label6,
+                        0
+                );
+                methodVisitor.visitLocalVariable(
+                        "loaderClass",
+                        "Ljava/lang/Class;",
+                        "Ljava/lang/Class<*>;",
+                        label2,
+                        label6,
+                        1
+                );
+                methodVisitor.visitLocalVariable(
+                        "javaBaseModule",
+                        "Ljava/lang/Module;",
+                        null,
+                        label3,
+                        label6,
+                        2
+                );
+                methodVisitor.visitLocalVariable(
+                        "loaderModule",
+                        "Ljava/lang/Module;",
+                        null,
+                        label4,
+                        label6,
+                        3
+                );
+                methodVisitor.visitLocalVariable(
+                        "javaLangAccess",
+                        "Ljdk/internal/access/JavaLangAccess;",
+                        null,
+                        label5,
+                        label6,
+                        4
+                );
 
                 methodVisitor.visitMaxs(4, 5);
                 methodVisitor.visitEnd();
@@ -1799,6 +1738,19 @@ public final class ReflectionUtils {
             classWriter.visitEnd();
 
             return classWriter.toByteArray();
+        }
+
+        /**
+         * Private constructor to prevent instantiation.
+         */
+        private InjectorGenerator() {
+            String callerBlame = "";
+            try {
+                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
+            } catch (IllegalCallerException ignored) {
+
+            }
+            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.InjectorGenerator.class) + callerBlame);
         }
     }
 }
