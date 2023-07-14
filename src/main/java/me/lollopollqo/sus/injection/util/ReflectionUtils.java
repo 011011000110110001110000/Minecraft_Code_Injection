@@ -1445,16 +1445,16 @@ public final class ReflectionUtils {
      * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
     private static class InjectorClassLoader extends ClassLoader {
-        InjectorClassLoader() {
+        private InjectorClassLoader() {
             super(InjectorClassLoader.class.getClassLoader());
         }
 
-        Class<?> define(byte[] data) {
+        private Class<?> define(byte[] data) {
             return defineClass(null, data, 0, data.length, null);
         }
 
         @SuppressWarnings("UnusedReturnValue")
-        Class<?> defineAndLoad(byte[] data) throws ClassNotFoundException {
+        private Class<?> defineAndLoad(byte[] data) throws ClassNotFoundException {
             return Class.forName(define(data).getName(), true, this);
         }
     }
