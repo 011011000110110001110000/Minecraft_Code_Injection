@@ -20,7 +20,7 @@ public class ReflectionUtilsTest {
     @Test
     void testChangeFieldType() throws Throwable {
         class Test {
-            private final boolean booleanField;
+            private boolean booleanField;
 
             Test() {
                 this.booleanField = true;
