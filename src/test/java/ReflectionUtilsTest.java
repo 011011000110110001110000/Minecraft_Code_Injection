@@ -30,6 +30,8 @@ public class ReflectionUtilsTest {
     @SuppressWarnings("unchecked")
     void testReflectionFilterRemoval() throws Throwable {
         Class<?> reflectionClass = Class.forName("jdk.internal.reflect.Reflection");
+        Class<?> lookupClass = Class.forName("java.lang.invoke.MethodHandles$Lookup");
+
         VarHandle fieldFilterMapHandle = ReflectionUtils.findStaticVarHandle(reflectionClass, "fieldFilterMap", Map.class);
         Map<Class<?>, Set<String>> fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapHandle.getVolatile();
         Assertions.assertTrue(fieldFilterMap.containsKey(reflectionClass));
@@ -39,6 +41,12 @@ public class ReflectionUtilsTest {
 
         Field fieldFilterMapField = ReflectionUtils.forceGetDeclaredFieldWithUnsafe(reflectionClass, "fieldFilterMap");
         Assertions.assertNull(fieldFilterMapField.get(null));
+
+        Field lookupClassField = ReflectionUtils.forceGetDeclaredFieldWithUnsafe(lookupClass, "lookupClass");
+        MethodHandles.Lookup lookup = MethodHandles.lookup();
+        Assertions.assertEquals(ReflectionUtilsTest.class, lookup.lookupClass());
+        Assertions.assertEquals(ReflectionUtilsTest.class, lookupClassField.get(lookup));
+        Assertions.assertEquals(lookup.lookupClass(), lookupClassField.get(lookup));
     }
 
     @Test
