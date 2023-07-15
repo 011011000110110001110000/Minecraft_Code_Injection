@@ -10,8 +10,8 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
-import java.util.*;
-import java.util.function.Function;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * <b>WIP</b> <br>
@@ -605,8 +605,8 @@ public final class ReflectionUtils {
         return MethodHandleHelper.unreflectConstructor(c);
     }
 
-    public static MethodHandle unreflectSpecial(Method m) throws ReflectiveOperationException {
-        return MethodHandleHelper.unreflectSpecial(m);
+    public static MethodHandle unreflectSpecial(Method m, Class<?> specialCaller) throws ReflectiveOperationException {
+        return MethodHandleHelper.unreflectSpecial(m, specialCaller);
     }
 
     public static MethodHandle unreflectGetter(Field f) throws ReflectiveOperationException {
@@ -679,19 +679,37 @@ public final class ReflectionUtils {
      * Helper class that holds a trusted {@link MethodHandles.Lookup} instance. <br>
      *
      * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
-     * @implNote Initializing this class from outside of {@link UnsafeHelper} <b>will</b> result in an access violation due to incorrect classloading order
      */
     private static final class LookupHelper {
         /**
-         * Trusted lookup
+         * Cached trusted lookup instance
          */
         private static final MethodHandles.Lookup LOOKUP;
+        /**
+         * Cached constructor for the {@link MethodHandles.Lookup} class
+         *
+         * @see #trustedLookupIn(Class)
+         */
+        private static final Constructor<MethodHandles.Lookup> LOOKUP_CONSTRUCTOR;
+        /**
+         * Used to denote that the lookup object has trusted access
+         */
+        private static final int TRUSTED_MODE = -1;
 
         static {
 
+            // Enable AccessibleObject#setAccessible(boolean) usage on the MethodHandles.Lookup members
             ModuleHelper.addOpens(Object.class.getModule(), "java.lang.invoke", LookupHelper.class.getModule());
 
-            LOOKUP = getTrustedLookup();
+            try {
+                LOOKUP_CONSTRUCTOR = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
+                LOOKUP_CONSTRUCTOR.setAccessible(true);
+            } catch (NoSuchMethodException nsme) {
+                throw new RuntimeException("Could not find " + getModuleInclusiveClassName(MethodHandles.Lookup.class) + "constructor", nsme);
+            }
+
+            LOOKUP = trustedLookupIn(Object.class);
+
         }
 
         /**
@@ -701,40 +719,24 @@ public final class ReflectionUtils {
          * @return the initialized class
          */
         private static <T> Class<T> ensureInitialized(Class<T> clazz) throws IllegalAccessException {
+            // We need to teleport the lookup to the specified class because of how the access checking is done,
+            // even though the lookup itself has trusted access
             LookupHelper.LOOKUP.in(clazz).ensureInitialized(clazz);
             return clazz;
         }
 
         /**
-         * Gets or creates a trusted {@link MethodHandles.Lookup} instance.
+         * Produces a trusted {@link MethodHandles.Lookup} instance with the given {@code lookupClass}.
          *
+         * @param lookupClass The desired lookup class
          * @return the {@link MethodHandles.Lookup} instance
          */
-        private static MethodHandles.Lookup getTrustedLookup() {
-            MethodHandles.Lookup implLookup;
+        private static MethodHandles.Lookup trustedLookupIn(Class<?> lookupClass) {
             try {
-                try {
-                    // Get the trusted lookup via reflection
-                    final Field implLookupField = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
-                    UnsafeHelper.unsafeSetAccessible(implLookupField, true);
-                    implLookup = (MethodHandles.Lookup) implLookupField.get(null);
-
-                } catch (ReflectiveOperationException roe) {
-                    // If for some reason we couldn't get the lookup via reflection, create a new instance ourselves
-
-                    // The access modes to use for the trusted lookup instance
-                    // See MethodHandles.Lookup#TRUSTED
-                    final int trusted = -1;
-                    final Constructor<MethodHandles.Lookup> lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
-
-                    UnsafeHelper.unsafeSetAccessible(lookupConstructor, true);
-                    implLookup = lookupConstructor.newInstance(Object.class, null, trusted);
-                }
-            } catch (ReflectiveOperationException roe) {
-                throw new RuntimeException("Could not get trusted lookup!", roe);
+                return LOOKUP_CONSTRUCTOR.newInstance(lookupClass, null, TRUSTED_MODE);
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException("Could not create an instance of " + getModuleInclusiveClassName(MethodHandles.Lookup.class), e);
             }
-
-            return implLookup;
         }
 
         /**
@@ -776,7 +778,7 @@ public final class ReflectionUtils {
          * @see java.lang.invoke.MethodHandles.Lookup#findGetter(Class, String, Class)
          */
         public static MethodHandle findGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(owner).findGetter(owner, name, type);
+            return LookupHelper.LOOKUP.findGetter(owner, name, type);
         }
 
         /**
@@ -798,15 +800,15 @@ public final class ReflectionUtils {
          * @see MethodHandles.Lookup#findStaticGetter(Class, String, Class)
          */
         public static MethodHandle findStaticGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(owner).findStaticGetter(owner, name, type);
+            return LookupHelper.LOOKUP.findStaticGetter(owner, name, type);
         }
 
         private static MethodHandle findSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(owner).findSetter(owner, name, type);
+            return LookupHelper.LOOKUP.findSetter(owner, name, type);
         }
 
         public static MethodHandle findStaticSetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(owner).findStaticSetter(owner, name, type);
+            return LookupHelper.LOOKUP.findStaticSetter(owner, name, type);
         }
 
         /**
@@ -862,11 +864,11 @@ public final class ReflectionUtils {
          * @see java.lang.invoke.MethodHandles.Lookup#findVirtual(Class, String, MethodType)
          */
         private static MethodHandle findVirtual(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(owner).findVirtual(owner, name, type);
+            return LookupHelper.LOOKUP.findVirtual(owner, name, type);
         }
 
         private static MethodHandle findStatic(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(owner).findStatic(owner, name, type);
+            return LookupHelper.LOOKUP.findStatic(owner, name, type);
         }
 
         private static MethodHandle findSpecial(Class<?> owner, String name, Class<?> specialCaller, MethodType type) throws ReflectiveOperationException {
@@ -874,27 +876,27 @@ public final class ReflectionUtils {
         }
 
         private static MethodHandle findConstructor(Class<?> owner, MethodType type) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(owner).findConstructor(owner, type);
+            return LookupHelper.LOOKUP.findConstructor(owner, type);
         }
 
         private static MethodHandle unreflect(Method m) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(m.getDeclaringClass()).unreflect(m);
+            return LookupHelper.LOOKUP.unreflect(m);
         }
 
-        private static MethodHandle unreflectSpecial(Method m) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(m.getDeclaringClass()).unreflectSpecial(m, m.getDeclaringClass());
+        private static MethodHandle unreflectSpecial(Method m, Class<?> specialCaller) throws ReflectiveOperationException {
+            return LookupHelper.LOOKUP.unreflectSpecial(m, specialCaller);
         }
 
         private static MethodHandle unreflectConstructor(Constructor<?> c) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(c.getDeclaringClass()).unreflectConstructor(c);
+            return LookupHelper.LOOKUP.unreflectConstructor(c);
         }
 
         private static MethodHandle unreflectGetter(Field f) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(f.getDeclaringClass()).unreflectGetter(f);
+            return LookupHelper.LOOKUP.unreflectGetter(f);
         }
 
         private static MethodHandle unreflectSetter(Field f) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(f.getDeclaringClass()).unreflectSetter(f);
+            return LookupHelper.LOOKUP.unreflectSetter(f);
         }
 
         /**
@@ -985,7 +987,7 @@ public final class ReflectionUtils {
          * and previously computed the witness value to be say {@code +0.0}.
          */
         private static VarHandle findVarHandle(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(owner).findVarHandle(owner, name, type);
+            return LookupHelper.LOOKUP.findVarHandle(owner, name, type);
         }
 
         /**
@@ -1058,11 +1060,11 @@ public final class ReflectionUtils {
          * and previously computed the witness value to be say {@code +0.0}.
          */
         private static VarHandle findStaticVarHandle(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(owner).findStaticVarHandle(owner, name, type);
+            return LookupHelper.LOOKUP.findStaticVarHandle(owner, name, type);
         }
 
         private static VarHandle unreflectVarHandle(Field f) throws ReflectiveOperationException {
-            return LookupHelper.LOOKUP.in(f.getDeclaringClass()).unreflectVarHandle(f);
+            return LookupHelper.LOOKUP.unreflectVarHandle(f);
         }
 
         /**
@@ -1097,13 +1099,12 @@ public final class ReflectionUtils {
         /**
          * Cached constructor for the {@link ModuleLayer.Controller} class
          *
-         * @see #LAYER_CONTROLLER_FACTORY
+         * @see #getControllerForLayer(ModuleLayer)
          */
         private static final Constructor<ModuleLayer.Controller> LAYER_CONTROLLER_CONSTRUCTOR;
         /**
-         * Internal factory object for obtaining instances of {@link ModuleLayer.Controller}
+         * The {@link jdk.internal.access.JavaLangAccess} instance
          */
-        private static final Function<Module, ModuleLayer.Controller> LAYER_CONTROLLER_FACTORY;
         private static final JavaLangAccess JAVA_LANG_ACCESS;
 
         static {
@@ -1112,7 +1113,7 @@ public final class ReflectionUtils {
 
             JAVA_LANG_ACCESS = jdk.internal.access.SharedSecrets.getJavaLangAccess();
 
-            // Open the java.lang package to this class' module so we can use AccessibleObject#setAccessible(boolean) on the ModuleLayer.Controller constructor
+            // Open the java.lang package to this class' module, so that we can use AccessibleObject#setAccessible(boolean) on the ModuleLayer.Controller constructor
             addOpens(ModuleLayer.Controller.class.getModule(), ModuleLayer.Controller.class.getPackageName(), ModuleHelper.class.getModule());
 
             try {
@@ -1121,14 +1122,6 @@ public final class ReflectionUtils {
             } catch (NoSuchMethodException nsme) {
                 throw new RuntimeException("Could not find constructor for " + getModuleInclusiveClassName(ModuleLayer.Controller.class), nsme);
             }
-
-            LAYER_CONTROLLER_FACTORY = module -> {
-                try {
-                    return LAYER_CONTROLLER_CONSTRUCTOR.newInstance(module.getLayer());
-                } catch (ReflectiveOperationException roe) {
-                    throw new RuntimeException("Could not create a new instance of " + getModuleInclusiveClassName(ModuleLayer.Controller.class), roe);
-                }
-            };
 
             try {
                 ALL_UNNAMED_MODULE = (Module) LookupHelper.LOOKUP.in(Module.class).findStaticGetter(Module.class, "ALL_UNNAMED_MODULE", Module.class).invoke();
@@ -1208,10 +1201,11 @@ public final class ReflectionUtils {
          * @param source      The module the package belongs to
          * @param packageName The name of the package
          * @param target      The module the package is to be exported to
-         * @return the newly created {@link ModuleLayer.Controller} instance that was used
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used to export the package
+         * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addExportsWithController(Module source, String packageName, Module target) {
-            return LAYER_CONTROLLER_FACTORY.apply(source).addExports(source, packageName, target);
+            return getControllerForModule(source).addExports(source, packageName, target);
         }
 
         /**
@@ -1219,7 +1213,8 @@ public final class ReflectionUtils {
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
-         * @return the newly created {@link ModuleLayer.Controller} instance that was used
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used to export the package
+         * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addExportsToAllUnnamedWithController(Module source, String packageName) {
             return addExportsWithController(source, packageName, ALL_UNNAMED_MODULE);
@@ -1230,7 +1225,8 @@ public final class ReflectionUtils {
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
-         * @return the newly created {@link ModuleLayer.Controller} instance that was used
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used to export the package
+         * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addExportsWithController(Module source, String packageName) {
             return addExportsWithController(source, packageName, EVERYONE_MODULE);
@@ -1242,10 +1238,11 @@ public final class ReflectionUtils {
          * @param source      The module the package belongs to
          * @param packageName The name of the package
          * @param target      The module the package is to be opened to
-         * @return the newly created {@link ModuleLayer.Controller} instance that was used
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used to open the package
+         * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addOpensWithController(Module source, String packageName, Module target) {
-            return LAYER_CONTROLLER_FACTORY.apply(source).addOpens(source, packageName, target);
+            return getControllerForModule(source).addOpens(source, packageName, target);
         }
 
         /**
@@ -1253,7 +1250,8 @@ public final class ReflectionUtils {
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
-         * @return the newly created {@link ModuleLayer.Controller} instance that was used
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used to open the package
+         * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addOpensToAllUnnamedWithController(Module source, String packageName) {
             return addOpensWithController(source, packageName, ALL_UNNAMED_MODULE);
@@ -1264,7 +1262,8 @@ public final class ReflectionUtils {
          *
          * @param source      The module the package belongs to
          * @param packageName The name of the package
-         * @return the newly created {@link ModuleLayer.Controller} instance that was used
+         * @return the newly created {@link ModuleLayer.Controller} instance that was used to open the package
+         * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addOpensWithController(Module source, String packageName) {
             return addOpensWithController(source, packageName, EVERYONE_MODULE);
@@ -1275,6 +1274,37 @@ public final class ReflectionUtils {
          */
         private static void bootstrap() {
             // NOOP
+        }
+
+        /**
+         * Produces a {@link ModuleLayer.Controller} instance that controls the layer the given module belongs to.
+         *
+         * @param module The module whose layer is to be controlled
+         * @return the {@link ModuleLayer.Controller} instance
+         * @throws UnsupportedOperationException if {@code module} is not in a {@link ModuleLayer}
+         */
+        private static ModuleLayer.Controller getControllerForModule(Module module) {
+            final ModuleLayer layer = module.getLayer();
+
+            if (layer == null) {
+                throw new UnsupportedOperationException("Cannot obtain a controller instance for module " + module.getName() + " because it is not in any layer");
+            }
+
+            return getControllerForLayer(layer);
+        }
+
+        /**
+         * Produces a {@link ModuleLayer.Controller} instance that controls the given {@link ModuleLayer}.
+         *
+         * @param layer The layer to be controlled
+         * @return the {@link ModuleLayer.Controller} instance
+         */
+        private static ModuleLayer.Controller getControllerForLayer(ModuleLayer layer) {
+            try {
+                return LAYER_CONTROLLER_CONSTRUCTOR.newInstance(layer);
+            } catch (ReflectiveOperationException roe) {
+                throw new RuntimeException("Could not create a new instance of " + getModuleInclusiveClassName(ModuleLayer.Controller.class), roe);
+            }
         }
 
         /**
@@ -1403,24 +1433,6 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Allocates a new instance of the given class without doing any initialization.
-         *
-         * @param clazz The class a new instance of which is to be created
-         * @return the allocated instance
-         * @throws RuntimeException if an {@link InstantiationException} occurs
-         * @see jdk.internal.misc.Unsafe#allocateInstance(Class)
-         */
-        @SuppressWarnings("unchecked")
-        @NotNull
-        private static <T> T allocateInstance(@NotNull Class<T> clazz) {
-            try {
-                return (T) INTERNAL_UNSAFE.allocateInstance(clazz);
-            } catch (InstantiationException ie) {
-                throw new RuntimeException("Failed to allocate instance of " + getModuleInclusiveClassName(clazz), ie);
-            }
-        }
-
-        /**
          * Private constructor to prevent instantiation.
          */
         private UnsafeHelper() {
@@ -1435,7 +1447,7 @@ public final class ReflectionUtils {
     }
 
     /**
-     * A custom and very bare-bones implementation of {@link ClassLoader} to be used in conjunction with the class generated by {@link InjectorGenerator#generateIn(String)}.
+     * A custom (and very bare-bones) implementation of {@link ClassLoader} to be used in conjunction with the class generated by {@link InjectorGenerator#generateIn(String)}.
      *
      * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
@@ -1485,10 +1497,10 @@ public final class ReflectionUtils {
         private static final String INJECTOR_CLASS_NAME = "Injector";
 
         /**
-         * Generates an injector class inside the given package.
+         * Generates an injector class inside the package with the given name.
          *
-         * @param packageName The package the class should be generated in
-         * @return the bytes of the generated class
+         * @param packageName The name of the package the class should be generated in
+         * @return the generated injector class' bytes
          */
         public static byte[] generateIn(final String packageName) {
             final String fullClassName = packageName + "/" + INJECTOR_CLASS_NAME;
@@ -1748,4 +1760,5 @@ public final class ReflectionUtils {
             throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.InjectorGenerator.class) + callerBlame);
         }
     }
+
 }

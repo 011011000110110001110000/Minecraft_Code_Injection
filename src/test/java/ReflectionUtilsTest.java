@@ -4,7 +4,10 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.Set;
 
 @SuppressWarnings("unused")
 public class ReflectionUtilsTest {
@@ -15,6 +18,27 @@ public class ReflectionUtilsTest {
                     Class<?> classReflectionUtils = Class.forName("me.lollopollqo.sus.injection.util.ReflectionUtils");
                 }
         );
+    }
+
+    @Test
+    void testEnsureInitialized() throws Throwable{
+        final Class<?> clazz = Class.forName("ReflectionUtilsTest$EnsureInitializedTestClass", false, ReflectionUtilsTest.class.getClassLoader());
+        ReflectionUtils.ensureInitialized(clazz);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testReflectionFilterRemoval() throws Throwable {
+        Class<?> reflectionClass = Class.forName("jdk.internal.reflect.Reflection");
+        VarHandle fieldFilterMapHandle = ReflectionUtils.findStaticVarHandle(reflectionClass, "fieldFilterMap", Map.class);
+        Map<Class<?>, Set<String>> fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapHandle.getVolatile();
+        Assertions.assertTrue(fieldFilterMap.containsKey(reflectionClass));
+        fieldFilterMapHandle.compareAndSet(fieldFilterMap, null);
+        fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapHandle.getVolatile();
+        Assertions.assertNull(fieldFilterMap);
+
+        Field fieldFilterMapField = ReflectionUtils.forceGetDeclaredFieldWithUnsafe(reflectionClass, "fieldFilterMap");
+        Assertions.assertNull(fieldFilterMapField.get(null));
     }
 
     @Test
@@ -83,4 +107,9 @@ public class ReflectionUtilsTest {
     void testTypedVarHandle() {
 
     }
+
+    private static class EnsureInitializedTestClass {
+
+    }
+
 }
