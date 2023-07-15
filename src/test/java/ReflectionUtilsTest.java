@@ -35,7 +35,7 @@ public class ReflectionUtilsTest {
         VarHandle fieldFilterMapHandle = ReflectionUtils.findStaticVarHandle(reflectionClass, "fieldFilterMap", Map.class);
         Map<Class<?>, Set<String>> fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapHandle.getVolatile();
         Assertions.assertTrue(fieldFilterMap.containsKey(reflectionClass));
-        fieldFilterMapHandle.compareAndSet(fieldFilterMap, null);
+        Assertions.assertTrue(fieldFilterMapHandle.compareAndSet(fieldFilterMap, null));
         fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapHandle.getVolatile();
         Assertions.assertNull(fieldFilterMap);
 
