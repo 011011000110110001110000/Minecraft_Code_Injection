@@ -12,6 +12,7 @@ import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * <b>WIP</b> <br>
@@ -26,6 +27,9 @@ public final class ReflectionUtils {
      * Cached {@link StackWalker} instance for caller checking
      */
     private static final StackWalker STACK_WALKER;
+    private static final Function<Class<?>, Field[]> declaredFieldsRetriever;
+    private static final Function<Class<?>, Method[]> declaredMethodsRetriever;
+    private static final Function<Class<?>, Constructor[]> declaredConstructorsRetriever;
 
     static {
 
@@ -33,6 +37,11 @@ public final class ReflectionUtils {
 
         // ModuleHelper needs to be initialized before the other helper classes
         ModuleHelper.bootstrap();
+
+        final MethodHandle nativeGetDeclaredFieldsHandle;
+        final MethodHandle nativeGetDeclaredMethodsHandle;
+        final MethodHandle nativeGetDeclaredConstructorsHandle;
+
     }
 
     /**
