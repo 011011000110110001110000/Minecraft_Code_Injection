@@ -29,7 +29,7 @@ public final class ReflectionUtils {
     private static final StackWalker STACK_WALKER;
     private static final Function<Class<?>, Field[]> declaredFieldsRetriever;
     private static final Function<Class<?>, Method[]> declaredMethodsRetriever;
-    private static final Function<Class<?>, Constructor[]> declaredConstructorsRetriever;
+    private static final Function<Class<?>, Constructor<?>[]> declaredConstructorsRetriever;
 
     static {
 
@@ -38,9 +38,71 @@ public final class ReflectionUtils {
         // ModuleHelper needs to be initialized before the other helper classes
         ModuleHelper.bootstrap();
 
-        final MethodHandle nativeGetDeclaredFieldsHandle;
-        final MethodHandle nativeGetDeclaredMethodsHandle;
-        final MethodHandle nativeGetDeclaredConstructorsHandle;
+        abstract class MemberRetrieverFinder {
+            final <T extends Member> Function<Class<?>, T[]> find(String name, Class<?> returnType, Class<?>... parameterTypes) throws NoSuchMethodException {
+                try {
+                    final MethodHandle handle = findVirtual(Class.class, name, returnType, parameterTypes);
+                    return clazz -> {
+                        try {
+                            return invoke(handle.bindTo(clazz));
+                        } catch (Throwable t) {
+                            throw new RuntimeException(t);
+                        }
+                    };
+                } catch (NoSuchMethodException nsme) {
+                    // Let NoSuchMethodException through
+                    throw nsme;
+                } catch (Throwable t) {
+                    throw new RuntimeException(t);
+                }
+            }
+
+            @SuppressWarnings("unchecked")
+            final <T> T unchecked(Object o) {
+                return (T) o;
+            }
+
+            abstract <T extends Member> T[] invoke(MethodHandle handle) throws Throwable;
+        }
+
+        final class HotspotFinder extends MemberRetrieverFinder {
+            @Override
+            <T extends Member> T[] invoke(MethodHandle handle) throws Throwable {
+                return unchecked(handle.invokeWithArguments(false));
+            }
+        }
+
+        final class SemeruFinder extends MemberRetrieverFinder {
+            @Override
+            <T extends Member> T[] invoke(MethodHandle handle) throws Throwable {
+                return unchecked(handle.invoke());
+            }
+        }
+
+        final MemberRetrieverFinder hotspotFinder = new HotspotFinder();
+        final MemberRetrieverFinder semeruFinder = new SemeruFinder();
+
+        Function<Class<?>, Field[]> tempDeclaredFieldsRetriever;
+        Function<Class<?>, Method[]> tempDeclaredMethodsRetriever;
+        Function<Class<?>, Constructor<?>[]> tempDeclaredConstructorsRetriever;
+
+        try {
+            try {
+                tempDeclaredFieldsRetriever = hotspotFinder.find("getDeclaredFields0", Field[].class, boolean.class);
+                tempDeclaredMethodsRetriever = hotspotFinder.find("getDeclaredMethods0", Method[].class, boolean.class);
+                tempDeclaredConstructorsRetriever = hotspotFinder.find("getDeclaredConstructors0", Constructor[].class, boolean.class);
+            } catch (NoSuchMethodException nsme) {
+                tempDeclaredFieldsRetriever = semeruFinder.find("getDeclaredFieldsImpl", Field[].class);
+                tempDeclaredMethodsRetriever = semeruFinder.find("getDeclaredMethodsImpl", Method[].class);
+                tempDeclaredConstructorsRetriever = semeruFinder.find("getDeclaredConstructorsImpl", Constructor[].class);
+            }
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
+        }
+
+        declaredFieldsRetriever = tempDeclaredFieldsRetriever;
+        declaredMethodsRetriever = tempDeclaredMethodsRetriever;
+        declaredConstructorsRetriever = tempDeclaredConstructorsRetriever;
 
     }
 
@@ -102,6 +164,18 @@ public final class ReflectionUtils {
             }
         }
         throw new NoSuchFieldException("Failed to get field from " + owner.getName() + " of type" + type.getName());
+    }
+
+    public static Field[] getAllDeclaredFields(Class<?> owner) {
+        return declaredFieldsRetriever.apply(owner);
+    }
+
+    public static Method[] getAllDeclaredMethods(Class<?> owner) {
+        return declaredMethodsRetriever.apply(owner);
+    }
+
+    public static Constructor<?>[] getAllDeclaredConstructors(Class<?> owner) {
+        return declaredConstructorsRetriever.apply(owner);
     }
 
     /**
