@@ -10,8 +10,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -30,6 +29,9 @@ public final class ReflectionUtils {
     private static final Function<Class<?>, Field[]> declaredFieldsRetriever;
     private static final Function<Class<?>, Method[]> declaredMethodsRetriever;
     private static final Function<Class<?>, Constructor<?>[]> declaredConstructorsRetriever;
+    private static final VarHandle reflectionCacheHandle;
+    private static final VarHandle fieldFilterMapHandle;
+    private static final VarHandle methodFilterMapHandle;
 
     static {
 
@@ -104,6 +106,30 @@ public final class ReflectionUtils {
         declaredMethodsRetriever = tempDeclaredMethodsRetriever;
         declaredConstructorsRetriever = tempDeclaredConstructorsRetriever;
 
+        VarHandle tempReflectionCacheHandle;
+        try {
+            try {
+                tempReflectionCacheHandle = findVarHandle(Class.class, "reflectionData", Class.forName("java.lang.Class$ReflectionData"));
+            } catch (ClassNotFoundException cnfe) {
+                // Semeru is a special case
+                tempReflectionCacheHandle = findVarHandle(Class.class, "reflectCache", Class.forName("java.lang.Class$ReflectCache"));
+            }
+        } catch (ReflectiveOperationException roe) {
+            throw new RuntimeException(roe);
+        }
+
+        reflectionCacheHandle = tempReflectionCacheHandle;
+
+        try {
+            // noinspection Java9ReflectionClassVisibility
+            final Class<?> reflectionClass = Class.forName("jdk.internal.reflect.Reflection");
+
+            fieldFilterMapHandle = findStaticVarHandle(reflectionClass, "fieldFilterMap", Map.class);
+            methodFilterMapHandle = findStaticVarHandle(reflectionClass, "methodFilterMap", Map.class);
+        } catch (ReflectiveOperationException roe) {
+            throw new RuntimeException(roe);
+        }
+
     }
 
     /**
@@ -176,6 +202,41 @@ public final class ReflectionUtils {
 
     public static Constructor<?>[] getAllDeclaredConstructors(Class<?> owner) {
         return declaredConstructorsRetriever.apply(owner);
+    }
+
+    /**
+     * Convenience method for invoking {@link #clearReflectionFiltersForClass(Class)} and {@link #clearReflectionCacheForClass(Class)} on a class.
+     * @param clazz The class whose reflection cache and filters are to be cleared
+     * @see #clearReflectionCacheForClass(Class)
+     * @see #clearReflectionFiltersForClass(Class)
+     */
+    public static void clearReflectionFiltersAndReflectionCacheForClass(Class<?> clazz) {
+        clearReflectionFiltersForClass(clazz);
+        clearReflectionCacheForClass(clazz);
+    }
+
+    public static void clearReflectionCacheForClass(Class<?> clazz) {
+        reflectionCacheHandle.setVolatile(clazz, null);
+    }
+
+    /**
+     * Removes any reflection filters that were set for the given class.
+     * @param clazz The class for which reflection filters are to be removed
+     * @see jdk.internal.reflect.Reflection#registerFieldsToFilter(Class, Set)
+     */
+    @SuppressWarnings("unchecked")
+    public static void clearReflectionFiltersForClass(Class<?> clazz) {
+        final Map<Class<?>, Set<String>> originalFieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapHandle.getVolatile();
+        final Map<Class<?>, Set<String>> originalMethodFilterMap = (Map<Class<?>, Set<String>>) methodFilterMapHandle.getVolatile();
+
+        final Map<Class<?>, Set<String>> newFieldFilterMap = new HashMap<>(originalFieldFilterMap);
+        final Map<Class<?>, Set<String>> newMethodFilterMap = new HashMap<>(originalMethodFilterMap);
+
+        newFieldFilterMap.remove(clazz);
+        newMethodFilterMap.remove(clazz);
+
+        fieldFilterMapHandle.setVolatile(newFieldFilterMap);
+        methodFilterMapHandle.setVolatile(newMethodFilterMap);
     }
 
     /**
