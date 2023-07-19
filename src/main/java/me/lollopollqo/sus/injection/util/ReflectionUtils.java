@@ -11,7 +11,6 @@ import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.*;
 import java.util.*;
-import java.util.function.Function;
 
 /**
  * <b>WIP</b> <br>
@@ -26,9 +25,6 @@ public final class ReflectionUtils {
      * Cached {@link StackWalker} instance for caller checking
      */
     private static final StackWalker STACK_WALKER;
-    private static final Function<Class<?>, Field[]> declaredFieldsRetriever;
-    private static final Function<Class<?>, Method[]> declaredMethodsRetriever;
-    private static final Function<Class<?>, Constructor<?>[]> declaredConstructorsRetriever;
     private static final VarHandle reflectionCacheHandle;
     private static final VarHandle fieldFilterMapHandle;
     private static final VarHandle methodFilterMapHandle;
@@ -40,79 +36,21 @@ public final class ReflectionUtils {
         // ModuleHelper needs to be initialized before the other helper classes
         ModuleHelper.bootstrap();
 
-        abstract class MemberRetrieverFinder {
-            final <T extends Member> Function<Class<?>, T[]> find(String name, Class<?> returnType, Class<?>... parameterTypes) throws NoSuchMethodException {
-                try {
-                    final MethodHandle handle = findVirtual(Class.class, name, returnType, parameterTypes);
-                    return clazz -> {
-                        try {
-                            return invoke(handle.bindTo(clazz));
-                        } catch (Throwable t) {
-                            throw new RuntimeException(t);
-                        }
-                    };
-                } catch (NoSuchMethodException nsme) {
-                    // Let NoSuchMethodException through
-                    throw nsme;
-                } catch (Throwable t) {
-                    throw new RuntimeException(t);
-                }
-            }
-
-            @SuppressWarnings("unchecked")
-            final <T> T unchecked(Object o) {
-                return (T) o;
-            }
-
-            abstract <T extends Member> T[] invoke(MethodHandle handle) throws Throwable;
-        }
-
-        final class HotspotFinder extends MemberRetrieverFinder {
-            @Override
-            <T extends Member> T[] invoke(MethodHandle handle) throws Throwable {
-                return unchecked(handle.invokeWithArguments(false));
-            }
-        }
-
-        final class SemeruFinder extends MemberRetrieverFinder {
-            @Override
-            <T extends Member> T[] invoke(MethodHandle handle) throws Throwable {
-                return unchecked(handle.invoke());
-            }
-        }
-
-        final MemberRetrieverFinder hotspotFinder = new HotspotFinder();
-        final MemberRetrieverFinder semeruFinder = new SemeruFinder();
-
-        Function<Class<?>, Field[]> tempDeclaredFieldsRetriever;
-        Function<Class<?>, Method[]> tempDeclaredMethodsRetriever;
-        Function<Class<?>, Constructor<?>[]> tempDeclaredConstructorsRetriever;
-
-        try {
-            try {
-                tempDeclaredFieldsRetriever = hotspotFinder.find("getDeclaredFields0", Field[].class, boolean.class);
-                tempDeclaredMethodsRetriever = hotspotFinder.find("getDeclaredMethods0", Method[].class, boolean.class);
-                tempDeclaredConstructorsRetriever = hotspotFinder.find("getDeclaredConstructors0", Constructor[].class, boolean.class);
-            } catch (NoSuchMethodException nsme) {
-                tempDeclaredFieldsRetriever = semeruFinder.find("getDeclaredFieldsImpl", Field[].class);
-                tempDeclaredMethodsRetriever = semeruFinder.find("getDeclaredMethodsImpl", Method[].class);
-                tempDeclaredConstructorsRetriever = semeruFinder.find("getDeclaredConstructorsImpl", Constructor[].class);
-            }
-        } catch (Throwable t) {
-            throw new RuntimeException(t);
-        }
-
-        declaredFieldsRetriever = tempDeclaredFieldsRetriever;
-        declaredMethodsRetriever = tempDeclaredMethodsRetriever;
-        declaredConstructorsRetriever = tempDeclaredConstructorsRetriever;
-
         VarHandle tempReflectionCacheHandle;
         try {
             try {
-                tempReflectionCacheHandle = findVarHandle(Class.class, "reflectionData", Class.forName("java.lang.Class$ReflectionData"));
+                tempReflectionCacheHandle = findVarHandle(
+                        Class.class,
+                        "reflectionData",
+                        Class.forName("java.lang.Class$ReflectionData")
+                );
             } catch (ClassNotFoundException cnfe) {
                 // Semeru is a special case
-                tempReflectionCacheHandle = findVarHandle(Class.class, "reflectCache", Class.forName("java.lang.Class$ReflectCache"));
+                tempReflectionCacheHandle = findVarHandle(
+                        Class.class,
+                        "reflectCache",
+                        Class.forName("java.lang.Class$ReflectCache")
+                );
             }
         } catch (ReflectiveOperationException roe) {
             throw new RuntimeException(roe);
@@ -192,20 +130,19 @@ public final class ReflectionUtils {
         throw new NoSuchFieldException("Failed to get field from " + owner.getName() + " of type" + type.getName());
     }
 
-    public static Field[] getAllDeclaredFields(Class<?> owner) {
-        return declaredFieldsRetriever.apply(owner);
+    public static Field[] getAllDeclaredFieldsOfClass(Class<?> owner) {
+        clearReflectionFiltersAndReflectionCacheForClass(owner);
+        return owner.getDeclaredFields();
     }
 
-    public static Method[] getAllDeclaredMethods(Class<?> owner) {
-        return declaredMethodsRetriever.apply(owner);
-    }
-
-    public static Constructor<?>[] getAllDeclaredConstructors(Class<?> owner) {
-        return declaredConstructorsRetriever.apply(owner);
+    public static Method[] getAllDeclaredMethodsOfClass(Class<?> owner) {
+        clearReflectionFiltersAndReflectionCacheForClass(owner);
+        return owner.getDeclaredMethods();
     }
 
     /**
      * Convenience method for invoking {@link #clearReflectionFiltersForClass(Class)} and {@link #clearReflectionCacheForClass(Class)} on a class.
+     *
      * @param clazz The class whose reflection cache and filters are to be cleared
      * @see #clearReflectionCacheForClass(Class)
      * @see #clearReflectionFiltersForClass(Class)
@@ -215,14 +152,21 @@ public final class ReflectionUtils {
         clearReflectionCacheForClass(clazz);
     }
 
+    /**
+     * Clears the cached reflection data for the given class.
+     *
+     * @param clazz The class whose reflection cache is to be cleared
+     */
     public static void clearReflectionCacheForClass(Class<?> clazz) {
         reflectionCacheHandle.setVolatile(clazz, null);
     }
 
     /**
      * Removes any reflection filters that were set for the given class.
+     *
      * @param clazz The class for which reflection filters are to be removed
      * @see jdk.internal.reflect.Reflection#registerFieldsToFilter(Class, Set)
+     * @see jdk.internal.reflect.Reflection#registerMethodsToFilter(Class, Set)
      */
     @SuppressWarnings("unchecked")
     public static void clearReflectionFiltersForClass(Class<?> clazz) {
