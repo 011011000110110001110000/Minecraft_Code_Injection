@@ -6,11 +6,13 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Set;
 
 @SuppressWarnings("unused")
 public class ReflectionUtilsTest {
+    static boolean dummyClassInitialized;
     @Test
     void testInit() {
         Assertions.assertDoesNotThrow(
@@ -22,31 +24,24 @@ public class ReflectionUtilsTest {
 
     @Test
     void testEnsureInitialized() throws Throwable{
-        final Class<?> clazz = Class.forName("ReflectionUtilsTest$EnsureInitializedTestClass", false, ReflectionUtilsTest.class.getClassLoader());
+        final Class<?> clazz = Class.forName("ReflectionUtilsTest$DummyClass", false, ReflectionUtilsTest.class.getClassLoader());
+        Assertions.assertFalse(dummyClassInitialized);
         ReflectionUtils.ensureInitialized(clazz);
+        Assertions.assertTrue(dummyClassInitialized);
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void testReflectionFilterRemoval() throws Throwable {
-        Class<?> reflectionClass = Class.forName("jdk.internal.reflect.Reflection");
-        Class<?> lookupClass = Class.forName("java.lang.invoke.MethodHandles$Lookup");
+    void testReflectionFilterRemoval() {
+        final Class<?> forTest = Field.class;
+        Field[] fields;
 
-        VarHandle fieldFilterMapHandle = ReflectionUtils.findStaticVarHandle(reflectionClass, "fieldFilterMap", Map.class);
-        Map<Class<?>, Set<String>> fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapHandle.getVolatile();
-        Assertions.assertTrue(fieldFilterMap.containsKey(reflectionClass));
-        Assertions.assertTrue(fieldFilterMapHandle.compareAndSet(fieldFilterMap, null));
-        fieldFilterMap = (Map<Class<?>, Set<String>>) fieldFilterMapHandle.getVolatile();
-        Assertions.assertNull(fieldFilterMap);
+        fields = forTest.getDeclaredFields();
+        Assertions.assertEquals(0, fields.length);
 
-        Field fieldFilterMapField = ReflectionUtils.forceGetDeclaredFieldWithUnsafe(reflectionClass, "fieldFilterMap");
-        Assertions.assertNull(fieldFilterMapField.get(null));
+        ReflectionUtils.clearReflectionFiltersAndCacheForClass(forTest);
 
-        Field lookupClassField = ReflectionUtils.forceGetDeclaredFieldWithUnsafe(lookupClass, "lookupClass");
-        MethodHandles.Lookup lookup = MethodHandles.lookup();
-        Assertions.assertEquals(ReflectionUtilsTest.class, lookup.lookupClass());
-        Assertions.assertEquals(ReflectionUtilsTest.class, lookupClassField.get(lookup));
-        Assertions.assertEquals(lookup.lookupClass(), lookupClassField.get(lookup));
+        fields = forTest.getDeclaredFields();
+        Assertions.assertNotEquals(0, fields.length);
     }
 
     @Test
@@ -116,8 +111,10 @@ public class ReflectionUtilsTest {
 
     }
 
-    private static class EnsureInitializedTestClass {
-
+    private static class DummyClass {
+        static {
+            dummyClassInitialized = true;
+        }
     }
 
 }

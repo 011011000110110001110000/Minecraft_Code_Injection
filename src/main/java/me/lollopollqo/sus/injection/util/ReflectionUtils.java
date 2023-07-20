@@ -9,6 +9,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
+import java.lang.ref.SoftReference;
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -28,6 +29,7 @@ public final class ReflectionUtils {
     private static final VarHandle reflectionCacheHandle;
     private static final VarHandle fieldFilterMapHandle;
     private static final VarHandle methodFilterMapHandle;
+    private static final VarHandle overrideHandle;
 
     static {
 
@@ -36,36 +38,50 @@ public final class ReflectionUtils {
         // ModuleHelper needs to be initialized before the other helper classes
         ModuleHelper.bootstrap();
 
+        final String className = Class.class.getName();
         VarHandle tempReflectionCacheHandle;
+        Class<?> fieldType;
+        String fieldName;
         try {
             try {
-                tempReflectionCacheHandle = findVarHandle(
-                        Class.class,
-                        "reflectionData",
-                        Class.forName("java.lang.Class$ReflectionData")
-                );
+                Class.forName(className + "$ReflectionData");
+                fieldType = SoftReference.class;
+                fieldName = "reflectionData";
             } catch (ClassNotFoundException cnfe) {
                 // Semeru is a special case
-                tempReflectionCacheHandle = findVarHandle(
-                        Class.class,
-                        "reflectCache",
-                        Class.forName("java.lang.Class$ReflectCache")
-                );
+                fieldType = Class.forName(className + "$ReflectCache");
+                fieldName = "reflectCache";
             }
+
+            tempReflectionCacheHandle = findVarHandle(Class.class, fieldName, fieldType);
         } catch (ReflectiveOperationException roe) {
-            throw new RuntimeException(roe);
+            throw new RuntimeException("Could not get VarHandle for the cached reflection data", roe);
         }
 
         reflectionCacheHandle = tempReflectionCacheHandle;
 
+        final String reflectionClassName = "jdk.internal.reflect.Reflection";
+        final String fieldFilterMap = "fieldFilterMap";
+        final String methodFilterMap = "methodFilterMap";
+
         try {
             // noinspection Java9ReflectionClassVisibility
-            final Class<?> reflectionClass = Class.forName("jdk.internal.reflect.Reflection");
+            final Class<?> reflectionClass = Class.forName(reflectionClassName);
 
             fieldFilterMapHandle = findStaticVarHandle(reflectionClass, "fieldFilterMap", Map.class);
             methodFilterMapHandle = findStaticVarHandle(reflectionClass, "methodFilterMap", Map.class);
+        } catch (ClassNotFoundException cnfe) {
+            throw new RuntimeException("Could not locate " + reflectionClassName, cnfe);
         } catch (ReflectiveOperationException roe) {
-            throw new RuntimeException(roe);
+            throw new RuntimeException("Could not get VarHandles for " + reflectionClassName + "#" + fieldFilterMap + " and " + reflectionClassName + "#" + methodFilterMap, roe);
+        }
+
+        final String override = "override";
+
+        try {
+            overrideHandle = findVarHandle(AccessibleObject.class, "override", boolean.class);
+        } catch (ReflectiveOperationException roe) {
+            throw new RuntimeException("Could not get VarHandle for "  + AccessibleObject.class.getName() + "#" + override, roe);
         }
 
     }
@@ -130,30 +146,53 @@ public final class ReflectionUtils {
         throw new NoSuchFieldException("Failed to get field from " + owner.getName() + " of type" + type.getName());
     }
 
+    /**
+     * Gets <em>all</em> declared fields of a class, bypassing reflection filters.
+     * This is done by first disabling all reflection filters for the class, then clearing the cached reflection data.
+     * Then, a regular invocation of {@link Class#getDeclaredFields()} is performed, and that call will be able to see all the declared fields,
+     * without any filters. In the same fashion as {@link #clearReflectionFiltersAndCacheForClass(Class)}, an invocation of this method on class {@code owner}
+     * will cause all subsequent calls to {@link Class#getDeclaredFields()} on {@code owner} to return the full, unfiltered list of declared fields.
+     *
+     * @param owner The class that owns the fields
+     * @return The unfiltered list of declared fields
+     * @see #getAllDeclaredMethodsOfClass(Class)
+     */
     public static Field[] getAllDeclaredFieldsOfClass(Class<?> owner) {
-        clearReflectionFiltersAndReflectionCacheForClass(owner);
+        clearReflectionFiltersAndCacheForClass(owner);
         return owner.getDeclaredFields();
     }
 
+    /**
+     * Gets <em>all</em> declared methods of a class, bypassing reflection filters.
+     * This is done by first disabling all reflection filters for the class, then clearing the cached reflection data.
+     * Then, a regular invocation of {@link Class#getDeclaredMethods()} is performed, and that call will be able to see all the declared fields,
+     * without any filters. In the same fashion as {@link #clearReflectionFiltersAndCacheForClass(Class)}, an invocation of this method on class {@code owner}
+     * will cause all subsequent calls to {@link Class#getDeclaredMethods()} on {@code owner} to return the full, unfiltered list of declared methods.
+     *
+     * @param owner The class that owns the methods
+     * @return The unfiltered list of declared methods
+     * @see #getAllDeclaredFieldsOfClass(Class)
+     */
     public static Method[] getAllDeclaredMethodsOfClass(Class<?> owner) {
-        clearReflectionFiltersAndReflectionCacheForClass(owner);
+        clearReflectionFiltersAndCacheForClass(owner);
         return owner.getDeclaredMethods();
     }
 
     /**
      * Convenience method for invoking {@link #clearReflectionFiltersForClass(Class)} and {@link #clearReflectionCacheForClass(Class)} on a class.
+     * This will cause any subsequent call of {@link Class#getDeclaredFields()} and {@link Class#getDeclaredMethods()} to return the full, unfiltered list.
      *
      * @param clazz The class whose reflection cache and filters are to be cleared
      * @see #clearReflectionCacheForClass(Class)
      * @see #clearReflectionFiltersForClass(Class)
      */
-    public static void clearReflectionFiltersAndReflectionCacheForClass(Class<?> clazz) {
+    public static void clearReflectionFiltersAndCacheForClass(Class<?> clazz) {
         clearReflectionFiltersForClass(clazz);
         clearReflectionCacheForClass(clazz);
     }
 
     /**
-     * Clears the cached reflection data for the given class.
+     * Atomically clears the cached reflection data for the given class.
      *
      * @param clazz The class whose reflection cache is to be cleared
      */
