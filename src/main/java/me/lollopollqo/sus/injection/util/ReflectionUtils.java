@@ -30,6 +30,7 @@ public final class ReflectionUtils {
     private static final VarHandle fieldFilterMapHandle;
     private static final VarHandle methodFilterMapHandle;
     private static final VarHandle overrideHandle;
+    private static final MethodHandle setAccessibleHandle;
 
     static {
 
@@ -42,6 +43,7 @@ public final class ReflectionUtils {
         VarHandle tempReflectionCacheHandle;
         Class<?> fieldType;
         String fieldName;
+
         try {
             try {
                 Class.forName(className + "$ReflectionData");
@@ -82,6 +84,12 @@ public final class ReflectionUtils {
             overrideHandle = findVarHandle(AccessibleObject.class, "override", boolean.class);
         } catch (ReflectiveOperationException roe) {
             throw new RuntimeException("Could not get VarHandle for "  + AccessibleObject.class.getName() + "#" + override, roe);
+        }
+
+        try {
+            setAccessibleHandle = findSpecial(AccessibleObject.class, "setAccessible", AccessibleObject.class, void.class, boolean.class);
+        } catch (ReflectiveOperationException roe) {
+            throw new RuntimeException(roe);
         }
 
     }
@@ -220,6 +228,15 @@ public final class ReflectionUtils {
 
         fieldFilterMapHandle.setVolatile(newFieldFilterMap);
         methodFilterMapHandle.setVolatile(newMethodFilterMap);
+    }
+
+    public static boolean setAccessible(AccessibleObject object, boolean accessible) {
+        try {
+            setAccessibleHandle.bindTo(object).invoke(accessible);
+            return accessible;
+        } catch (Throwable t) {
+            throw new RuntimeException("Could not force the accessibility of " + object + " to be set to " + accessible, t);
+        }
     }
 
     /**
