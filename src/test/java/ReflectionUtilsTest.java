@@ -4,11 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.Map;
-import java.util.Set;
 
 @SuppressWarnings("unused")
 public class ReflectionUtilsTest {
