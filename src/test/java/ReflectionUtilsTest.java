@@ -4,23 +4,24 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
+import java.lang.reflect.InaccessibleObjectException;
+import java.util.ArrayList;
 
 @SuppressWarnings("unused")
 public class ReflectionUtilsTest {
     static boolean dummyClassInitialized;
+
     @Test
-    void testInit() {
-        Assertions.assertDoesNotThrow(
-                () -> {
-                    Class<?> classReflectionUtils = Class.forName("me.lollopollqo.sus.injection.util.ReflectionUtils");
-                }
-        );
+    void testInit() throws Throwable {
+        Class<?> classReflectionUtils = Class.forName("me.lollopollqo.sus.injection.util.ReflectionUtils");
     }
 
     @Test
-    void testEnsureInitialized() throws Throwable{
+    void testEnsureInitialized() throws Throwable {
         final Class<?> clazz = Class.forName("ReflectionUtilsTest$DummyClass", false, ReflectionUtilsTest.class.getClassLoader());
+
         Assertions.assertFalse(dummyClassInitialized);
         ReflectionUtils.ensureInitialized(clazz);
         Assertions.assertTrue(dummyClassInitialized);
@@ -41,6 +42,29 @@ public class ReflectionUtilsTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
+    void testSetAccessible() throws Throwable {
+        final Field serialVersionUID = ArrayList.class.getDeclaredField("serialVersionUID");
+        final MethodHandle setAccessible = ReflectionUtils.findVirtual(AccessibleObject.class, "setAccessible", void.class, boolean.class);
+
+        Assertions.assertFalse(serialVersionUID.isAccessible());
+
+        Assertions.assertThrowsExactly(
+                InaccessibleObjectException.class,
+                () -> serialVersionUID.setAccessible(true)
+        );
+
+        Assertions.assertThrowsExactly(
+                InaccessibleObjectException.class,
+                () -> setAccessible.bindTo(serialVersionUID).invoke(true)
+        );
+
+        ReflectionUtils.setAccessible(serialVersionUID, true);
+
+        Assertions.assertTrue(serialVersionUID.isAccessible());
+    }
+
+    @Test
     void testChangeFieldType() throws Throwable {
         class Test {
             private boolean booleanField;
@@ -50,21 +74,21 @@ public class ReflectionUtilsTest {
             }
         }
 
-        {
-            final Test testObj = new Test();
-            final MethodHandle typeSetter = ReflectionUtils.findSetter(Field.class, "type", Class.class);
-            final MethodHandle rootGetter = ReflectionUtils.findGetter(Field.class, "root", Field.class);
-            final Field booleanFieldCopy = Test.class.getDeclaredField("booleanField");
-            final Field booleanField = (Field) rootGetter.bindTo(booleanFieldCopy).invoke();
-            typeSetter.bindTo(booleanField).invoke(String.class);
-            booleanField.set(testObj, "Such boolean");
-            System.out.println(booleanField.get(testObj));
-            System.out.println(testObj.booleanField);
-        }
+        final String suchBoolean = "Such boolean";
+        final Test testObj = new Test();
+        final MethodHandle typeSetter = ReflectionUtils.findSetter(Field.class, "type", Class.class);
+        final MethodHandle rootGetter = ReflectionUtils.findGetter(Field.class, "root", Field.class);
+        final Field booleanFieldCopy = Test.class.getDeclaredField("booleanField");
+        final Field booleanField = (Field) rootGetter.bindTo(booleanFieldCopy).invoke();
+
+        typeSetter.bindTo(booleanField).invoke(String.class);
+        booleanField.set(testObj, "Such boolean");
+
+        Assertions.assertSame(suchBoolean, booleanField.get(testObj));
     }
 
     @Test
-    void testMethodHandleCracking() {
+    void testMethodHandleCracking() throws Throwable {
         class Test {
             private final Object privateField;
 
@@ -73,17 +97,13 @@ public class ReflectionUtilsTest {
             }
         }
 
-        Assertions.assertDoesNotThrow(
-                () -> {
-                    final Test testObject = new Test();
-                    final MethodHandle privateFieldGetter = ReflectionUtils.findGetter(Test.class, "privateField", Object.class);
-                    final Field privateFieldField = MethodHandles.reflectAs(Field.class, privateFieldGetter);
+        final Test testObject = new Test();
+        final MethodHandle privateFieldGetter = ReflectionUtils.findGetter(Test.class, "privateField", Object.class);
+        final Field privateFieldField = MethodHandles.reflectAs(Field.class, privateFieldGetter);
 
-                    privateFieldField.setAccessible(true);
+        privateFieldField.setAccessible(true);
 
-                    Assertions.assertEquals(privateFieldGetter.invoke(testObject), privateFieldField.get(testObject));
-                }
-        );
+        Assertions.assertEquals(privateFieldGetter.invoke(testObject), privateFieldField.get(testObject));
     }
 
     @Test

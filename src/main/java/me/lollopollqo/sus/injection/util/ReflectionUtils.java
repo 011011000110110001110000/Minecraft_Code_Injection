@@ -29,7 +29,6 @@ public final class ReflectionUtils {
     private static final VarHandle reflectionCacheHandle;
     private static final VarHandle fieldFilterMapHandle;
     private static final VarHandle methodFilterMapHandle;
-    private static final VarHandle overrideHandle;
     private static final MethodHandle setAccessibleHandle;
 
     static {
@@ -76,14 +75,6 @@ public final class ReflectionUtils {
             throw new RuntimeException("Could not locate " + reflectionClassName, cnfe);
         } catch (ReflectiveOperationException roe) {
             throw new RuntimeException("Could not get VarHandles for " + reflectionClassName + "#" + fieldFilterMap + " and " + reflectionClassName + "#" + methodFilterMap, roe);
-        }
-
-        final String override = "override";
-
-        try {
-            overrideHandle = findVarHandle(AccessibleObject.class, "override", boolean.class);
-        } catch (ReflectiveOperationException roe) {
-            throw new RuntimeException("Could not get VarHandle for "  + AccessibleObject.class.getName() + "#" + override, roe);
         }
 
         try {
