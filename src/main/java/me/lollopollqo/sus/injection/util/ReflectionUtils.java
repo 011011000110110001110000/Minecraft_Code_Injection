@@ -1,9 +1,11 @@
 package me.lollopollqo.sus.injection.util;
 
-import jdk.internal.access.JavaLangAccess;
 import org.jetbrains.annotations.NotNull;
+
 import org.objectweb.asm.Type;
 import org.objectweb.asm.*;
+
+import jdk.internal.access.JavaLangAccess;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -458,8 +460,8 @@ public final class ReflectionUtils {
      * Produces a method handle for a static method. <br>
      * See the documentation for {@link MethodHandles.Lookup#findStatic(Class, String, MethodType)} for details.
      *
-     * @param owner The class from which the method is accessed
-     * @param name  The name of the method
+     * @param owner          The class from which the method is accessed
+     * @param name           The name of the method
      * @param parameterTypes The parameter types of the method, in order
      * @return the desired method handle
      * @throws ReflectiveOperationException if the method does not exist, if access checking fails, if the method is not {@code static},
@@ -488,8 +490,8 @@ public final class ReflectionUtils {
      * Produces a method handle which creates an object and initializes it, using the constructor of the specified type. <br>
      * See the documentation for {@link MethodHandles.Lookup#findConstructor(Class, MethodType)} for details.
      *
-     * @param owner The class or interface from which the method is accessed
-     * @param parameterTypes  The parameter types of the constructor, in order
+     * @param owner          The class or interface from which the method is accessed
+     * @param parameterTypes The parameter types of the constructor, in order
      * @return the desired method handle
      * @throws ReflectiveOperationException if the constructor does not exist, if access checking fails or
      *                                      if the method's variable arity modifier bit is set and {@link MethodHandle#asVarargsCollector(Class)} fails
