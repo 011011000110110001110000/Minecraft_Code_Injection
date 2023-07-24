@@ -74,7 +74,7 @@ public final class ReflectionUtils {
                 fieldName = "reflectCache";
             }
 
-            tempReflectionCacheHandle = findVarHandle(Class.class, fieldName, fieldType);
+            tempReflectionCacheHandle = ReflectionUtils.findVarHandle(Class.class, fieldName, fieldType);
         } catch (ReflectiveOperationException roe) {
             throw new RuntimeException("Could not get VarHandle for the cached reflection data", roe);
         }
@@ -88,8 +88,8 @@ public final class ReflectionUtils {
         try {
             final Class<?> reflectionClass = Class.forName(reflectionClassName);
 
-            fieldFilterMapHandle = findStaticVarHandle(reflectionClass, fieldFilterMap, Map.class);
-            methodFilterMapHandle = findStaticVarHandle(reflectionClass, methodFilterMap, Map.class);
+            fieldFilterMapHandle = ReflectionUtils.findStaticVarHandle(reflectionClass, fieldFilterMap, Map.class);
+            methodFilterMapHandle = ReflectionUtils.findStaticVarHandle(reflectionClass, methodFilterMap, Map.class);
         } catch (ClassNotFoundException cnfe) {
             throw new RuntimeException("Could not locate " + reflectionClassName, cnfe);
         } catch (ReflectiveOperationException roe) {
@@ -99,7 +99,7 @@ public final class ReflectionUtils {
         final String setAccessible = "setAccessible";
 
         try {
-            setAccessibleHandle = findSpecial(AccessibleObject.class, setAccessible, AccessibleObject.class, void.class, boolean.class);
+            setAccessibleHandle = ReflectionUtils.findSpecial(AccessibleObject.class, setAccessible, AccessibleObject.class, void.class, boolean.class);
         } catch (ReflectiveOperationException roe) {
             throw new RuntimeException("Could not get MethodHandle with invokespecial behavior for " + AccessibleObject.class.getName() + "#" + setAccessible + "(boolean)", roe);
         }
@@ -122,7 +122,7 @@ public final class ReflectionUtils {
      */
     public static Field getAccessibleDeclaredField(Class<?> owner, String name) throws NoSuchFieldException {
         Field field = owner.getDeclaredField(name);
-        setAccessible(field, true);
+        ReflectionUtils.setAccessible(field, true);
         return field;
     }
 
@@ -143,7 +143,7 @@ public final class ReflectionUtils {
      */
     public static Method getAccessibleDeclaredMethod(Class<?> owner, String name, Class<?>... paramTypes) throws NoSuchMethodException {
         Method method = owner.getDeclaredMethod(name, paramTypes);
-        setAccessible(method, true);
+        ReflectionUtils.setAccessible(method, true);
         return method;
     }
 
@@ -159,8 +159,8 @@ public final class ReflectionUtils {
      * @see #setAccessible(AccessibleObject, boolean)
      */
     public static Field getAccessibleDeclaredFieldNoFilter(Class<?> owner, String name) throws NoSuchFieldException {
-        ensureUnfilteredReflection(owner);
-        return getAccessibleDeclaredField(owner, name);
+        ReflectionUtils.ensureUnfilteredReflection(owner);
+        return ReflectionUtils.getAccessibleDeclaredField(owner, name);
     }
 
     /**
@@ -176,8 +176,8 @@ public final class ReflectionUtils {
      * @see #setAccessible(AccessibleObject, boolean)
      */
     public static Method getAccessibleDeclaredMethodNoFilter(Class<?> owner, String name, Class<?>... paramTypes) throws NoSuchMethodException {
-        ensureUnfilteredReflection(owner);
-        return getAccessibleDeclaredMethod(owner, name, paramTypes);
+        ReflectionUtils.ensureUnfilteredReflection(owner);
+        return ReflectionUtils.getAccessibleDeclaredMethod(owner, name, paramTypes);
     }
 
     /**
@@ -194,7 +194,7 @@ public final class ReflectionUtils {
      * @see jdk.internal.reflect.Reflection#filterFields(Class, Field[])
      */
     public static Field[] getAllDeclaredFieldsOfClass(Class<?> owner) {
-        ensureUnfilteredReflection(owner);
+        ReflectionUtils.ensureUnfilteredReflection(owner);
         return owner.getDeclaredFields();
     }
 
@@ -212,7 +212,7 @@ public final class ReflectionUtils {
      * @see jdk.internal.reflect.Reflection#filterMethods(Class, Method[])
      */
     public static Method[] getAllDeclaredMethodsOfClass(Class<?> owner) {
-        ensureUnfilteredReflection(owner);
+        ReflectionUtils.ensureUnfilteredReflection(owner);
         return owner.getDeclaredMethods();
     }
 
@@ -222,8 +222,8 @@ public final class ReflectionUtils {
      * @param clazz The class on which reflective operations will be performed
      */
     public static void ensureUnfilteredReflection(Class<?> clazz) {
-        clearReflectionFiltersForClass(clazz);
-        clearReflectionCacheForClass(clazz);
+        ReflectionUtils.clearReflectionFiltersForClass(clazz);
+        ReflectionUtils.clearReflectionCacheForClass(clazz);
     }
 
     /**
@@ -399,7 +399,7 @@ public final class ReflectionUtils {
     @SuppressWarnings("unchecked")
     public static <T> T getFieldValue(Object owner, String name, Class<T> type) {
         try {
-            return (T) findGetter(owner.getClass(), name, type).invoke(owner);
+            return (T) ReflectionUtils.findGetter(owner.getClass(), name, type).invoke(owner);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to get field " + name + " from " + getModuleInclusiveClassName(owner.getClass()), e);
         }
@@ -418,7 +418,7 @@ public final class ReflectionUtils {
      */
     @SuppressWarnings("unchecked")
     public static <T> T invokeNonStatic(Object owner, String name, Class<T> returnType, Class<?>[] argumentTypes, Object... arguments) {
-        return (T) invokeNonStatic(owner, name, MethodType.methodType(returnType, argumentTypes), arguments);
+        return (T) ReflectionUtils.invokeNonStatic(owner, name, MethodType.methodType(returnType, argumentTypes), arguments);
     }
 
     /**
@@ -452,7 +452,7 @@ public final class ReflectionUtils {
      * @see #findVirtual(Class, String, MethodType)
      */
     public static MethodHandle findVirtual(Class<?> owner, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
-        return findVirtual(owner, name, MethodType.methodType(returnType, parameterTypes));
+        return ReflectionUtils.findVirtual(owner, name, MethodType.methodType(returnType, parameterTypes));
     }
 
     /**
@@ -484,7 +484,7 @@ public final class ReflectionUtils {
      * @see #findVirtualAndBind(Class, Object, String, MethodType)
      */
     public static <O, T extends O> MethodHandle findVirtualAndBind(Class<T> owner, O instance, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
-        return findVirtualAndBind(owner, instance, name, MethodType.methodType(returnType, parameterTypes));
+        return ReflectionUtils.findVirtualAndBind(owner, instance, name, MethodType.methodType(returnType, parameterTypes));
     }
 
     /**
@@ -499,7 +499,7 @@ public final class ReflectionUtils {
      *                                      or if the method's variable arity modifier bit is set and {@link MethodHandle#asVarargsCollector(Class)} fails
      */
     public static <O, T extends O> MethodHandle findVirtualAndBind(Class<T> owner, O instance, String name, MethodType type) throws ReflectiveOperationException {
-        return findVirtual(owner, name, type).bindTo(instance);
+        return ReflectionUtils.findVirtual(owner, name, type).bindTo(instance);
     }
 
     /**
@@ -514,7 +514,7 @@ public final class ReflectionUtils {
      *                                      or if the method's variable arity modifier bit is set and {@link MethodHandle#asVarargsCollector(Class)} fails
      */
     public static MethodHandle findStatic(Class<?> owner, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
-        return findStatic(owner, name, MethodType.methodType(returnType, parameterTypes));
+        return ReflectionUtils.findStatic(owner, name, MethodType.methodType(returnType, parameterTypes));
     }
 
     /**
@@ -544,7 +544,7 @@ public final class ReflectionUtils {
      * @see #findConstructor(Class, MethodType)
      */
     public static MethodHandle findConstructor(Class<?> owner, Class<?>... parameterTypes) throws ReflectiveOperationException {
-        return findConstructor(owner, MethodType.methodType(void.class, parameterTypes));
+        return ReflectionUtils.findConstructor(owner, MethodType.methodType(void.class, parameterTypes));
     }
 
     /**
@@ -578,7 +578,7 @@ public final class ReflectionUtils {
      * @see #findSpecial(Class, String, Class, MethodType)
      */
     public static MethodHandle findSpecial(Class<?> owner, String name, Class<?> specialCaller, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
-        return findSpecial(owner, name, specialCaller, MethodType.methodType(returnType, parameterTypes));
+        return ReflectionUtils.findSpecial(owner, name, specialCaller, MethodType.methodType(returnType, parameterTypes));
     }
 
     /**
@@ -624,7 +624,7 @@ public final class ReflectionUtils {
      * @throws ReflectiveOperationException if the field does not exist, if access checking fails, or if the field is {@code static}
      */
     public static <T, O extends T> MethodHandle findGetterAndBind(Class<T> owner, O instance, String name, Class<?> type) throws ReflectiveOperationException {
-        return findGetter(owner, name, type).bindTo(instance);
+        return ReflectionUtils.findGetter(owner, name, type).bindTo(instance);
     }
 
     /**
@@ -666,7 +666,7 @@ public final class ReflectionUtils {
      * @throws ReflectiveOperationException if the field does not exist, if access checking fails, or if the field is {@code static} or {@code final}
      */
     public static <T, O extends T> MethodHandle findSetterAndBind(Class<T> owner, O instance, String name, Class<?> type) throws ReflectiveOperationException {
-        return findSetter(owner, name, type).bindTo(instance);
+        return ReflectionUtils.findSetter(owner, name, type).bindTo(instance);
     }
 
     /**
@@ -801,7 +801,7 @@ public final class ReflectionUtils {
      * @see #loadClass(String, ClassLoader)
      */
     public static <T> Class<T> loadClass(@NotNull String name) throws ClassNotFoundException {
-        return loadClass(name, ReflectionUtils.class.getClassLoader());
+        return ReflectionUtils.loadClass(name, ReflectionUtils.class.getClassLoader());
     }
 
     /**
@@ -813,7 +813,7 @@ public final class ReflectionUtils {
      * @see #loadClass(String, ClassLoader)
      */
     public static <T> Class<T> loadClassWithSystemLoader(@NotNull String name) throws ClassNotFoundException {
-        return loadClass(name, ClassLoader.getSystemClassLoader());
+        return ReflectionUtils.loadClass(name, ClassLoader.getSystemClassLoader());
     }
 
     /**
@@ -840,7 +840,7 @@ public final class ReflectionUtils {
     @NotNull
     public static Class<?>[] ensureInitialized(@NotNull Class<?> @NotNull ... classes) {
         for (Class<?> clazz : classes) {
-            ensureInitialized(clazz);
+            ReflectionUtils.ensureInitialized(clazz);
         }
         return classes;
     }
@@ -877,11 +877,11 @@ public final class ReflectionUtils {
     private ReflectionUtils() {
         String callerBlame = "";
         try {
-            callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
+            callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
         } catch (IllegalCallerException ignored) {
 
         }
-        throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.class) + callerBlame);
+        throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.class) + callerBlame);
     }
 
     /**
@@ -1108,11 +1108,11 @@ public final class ReflectionUtils {
         private MethodHandleHelper() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
+                callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
-            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.MethodHandleHelper.class) + callerBlame);
+            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.MethodHandleHelper.class) + callerBlame);
         }
     }
 
@@ -1177,11 +1177,11 @@ public final class ReflectionUtils {
         private VarHandleHelper() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
+                callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
-            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.VarHandleHelper.class) + callerBlame);
+            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.VarHandleHelper.class) + callerBlame);
         }
     }
 
@@ -1215,10 +1215,10 @@ public final class ReflectionUtils {
                 LOOKUP_CONSTRUCTOR = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Class.class, int.class);
                 LOOKUP_CONSTRUCTOR.setAccessible(true);
             } catch (NoSuchMethodException nsme) {
-                throw new RuntimeException("Could not find " + getModuleInclusiveClassName(MethodHandles.Lookup.class) + "constructor", nsme);
+                throw new RuntimeException("Could not find " + ReflectionUtils.getModuleInclusiveClassName(MethodHandles.Lookup.class) + "constructor", nsme);
             }
 
-            LOOKUP = trustedLookupIn(Object.class);
+            LOOKUP = LookupHelper.trustedLookupIn(Object.class);
 
         }
 
@@ -1245,7 +1245,7 @@ public final class ReflectionUtils {
             try {
                 return LOOKUP_CONSTRUCTOR.newInstance(lookupClass, null, TRUSTED_MODE);
             } catch (ReflectiveOperationException e) {
-                throw new RuntimeException("Could not create an instance of " + getModuleInclusiveClassName(MethodHandles.Lookup.class), e);
+                throw new RuntimeException("Could not create an instance of " + ReflectionUtils.getModuleInclusiveClassName(MethodHandles.Lookup.class), e);
             }
         }
 
@@ -1255,11 +1255,11 @@ public final class ReflectionUtils {
         private LookupHelper() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
+                callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
-            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(LookupHelper.class) + callerBlame);
+            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(LookupHelper.class) + callerBlame);
         }
     }
 
@@ -1288,7 +1288,7 @@ public final class ReflectionUtils {
         static {
 
             // Open the java.lang package to this class' module, so that we can freely invoke Constructor#setAccessible(boolean) on the ModuleLayer.Controller constructor
-            addOpens(ModuleLayer.Controller.class.getModule(), ModuleLayer.Controller.class.getPackageName(), ModuleHelper.class.getModule());
+            ModuleHelper.addOpens(ModuleLayer.Controller.class.getModule(), ModuleLayer.Controller.class.getPackageName(), ModuleHelper.class.getModule());
 
             try {
                 LAYER_CONTROLLER_CONSTRUCTOR = ModuleLayer.Controller.class.getDeclaredConstructor(ModuleLayer.class);
@@ -1378,7 +1378,7 @@ public final class ReflectionUtils {
          * we use the special {@link #EVERYONE_MODULE} instance as if it was any other normal module
          */
         private static void addOpens(Module source, String packageName) {
-            addOpens(source, packageName, EVERYONE_MODULE);
+            ModuleHelper.addOpens(source, packageName, EVERYONE_MODULE);
         }
 
         /**
@@ -1391,7 +1391,7 @@ public final class ReflectionUtils {
          * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addExportsWithController(Module source, String packageName, Module target) {
-            return getControllerForModule(source).addExports(source, packageName, target);
+            return ModuleHelper.getControllerForModule(source).addExports(source, packageName, target);
         }
 
         /**
@@ -1403,7 +1403,7 @@ public final class ReflectionUtils {
          * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addExportsToAllUnnamedWithController(Module source, String packageName) {
-            return addExportsWithController(source, packageName, ALL_UNNAMED_MODULE);
+            return ModuleHelper.addExportsWithController(source, packageName, ALL_UNNAMED_MODULE);
         }
 
         /**
@@ -1415,7 +1415,7 @@ public final class ReflectionUtils {
          * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addExportsWithController(Module source, String packageName) {
-            return addExportsWithController(source, packageName, EVERYONE_MODULE);
+            return ModuleHelper.addExportsWithController(source, packageName, EVERYONE_MODULE);
         }
 
         /**
@@ -1428,7 +1428,7 @@ public final class ReflectionUtils {
          * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addOpensWithController(Module source, String packageName, Module target) {
-            return getControllerForModule(source).addOpens(source, packageName, target);
+            return ModuleHelper.getControllerForModule(source).addOpens(source, packageName, target);
         }
 
         /**
@@ -1440,7 +1440,7 @@ public final class ReflectionUtils {
          * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addOpensToAllUnnamedWithController(Module source, String packageName) {
-            return addOpensWithController(source, packageName, ALL_UNNAMED_MODULE);
+            return ModuleHelper.addOpensWithController(source, packageName, ALL_UNNAMED_MODULE);
         }
 
         /**
@@ -1452,7 +1452,7 @@ public final class ReflectionUtils {
          * @throws UnsupportedOperationException if {@code source} is not in a {@link ModuleLayer}
          */
         private static ModuleLayer.Controller addOpensWithController(Module source, String packageName) {
-            return addOpensWithController(source, packageName, EVERYONE_MODULE);
+            return ModuleHelper.addOpensWithController(source, packageName, EVERYONE_MODULE);
         }
 
         /**
@@ -1469,7 +1469,7 @@ public final class ReflectionUtils {
                 throw new UnsupportedOperationException("Cannot obtain a controller instance for module " + module.getName() + " because it is not in any layer");
             }
 
-            return getControllerForLayer(layer);
+            return ModuleHelper.getControllerForLayer(layer);
         }
 
         /**
@@ -1482,21 +1482,8 @@ public final class ReflectionUtils {
             try {
                 return LAYER_CONTROLLER_CONSTRUCTOR.newInstance(layer);
             } catch (ReflectiveOperationException roe) {
-                throw new RuntimeException("Could not create a new instance of " + getModuleInclusiveClassName(ModuleLayer.Controller.class), roe);
+                throw new RuntimeException("Could not create a new instance of " + ReflectionUtils.getModuleInclusiveClassName(ModuleLayer.Controller.class), roe);
             }
-        }
-
-        /**
-         * Private constructor to prevent instantiation.
-         */
-        private ModuleHelper() {
-            String callerBlame = "";
-            try {
-                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
-            } catch (IllegalCallerException ignored) {
-
-            }
-            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.ModuleHelper.class) + callerBlame);
         }
 
         /**
@@ -1506,6 +1493,20 @@ public final class ReflectionUtils {
         private static void bootstrap() {
             // NO-OP
         }
+
+        /**
+         * Private constructor to prevent instantiation.
+         */
+        private ModuleHelper() {
+            String callerBlame = "";
+            try {
+                callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
+            } catch (IllegalCallerException ignored) {
+
+            }
+            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.ModuleHelper.class) + callerBlame);
+        }
+
     }
 
     /**
@@ -1532,7 +1533,7 @@ public final class ReflectionUtils {
 
             ModuleHelper.addExports(Object.class.getModule(), "jdk.internal.misc", UnsafeHelper.class.getModule());
 
-            UNSAFE = findUnsafe();
+            UNSAFE = UnsafeHelper.findUnsafe();
             INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
 
             // Bypass reflection filters by using the jdk.internal.misc.Unsafe instance
@@ -1596,11 +1597,11 @@ public final class ReflectionUtils {
         private UnsafeHelper() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
+                callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
-            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.UnsafeHelper.class) + callerBlame);
+            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.UnsafeHelper.class) + callerBlame);
         }
     }
 
@@ -1625,7 +1626,7 @@ public final class ReflectionUtils {
          * @return the {@code Class} object created from the data
          */
         private Class<?> define(byte[] classBytes) {
-            return defineClass(null, classBytes, 0, classBytes.length, null);
+            return this.defineClass(null, classBytes, 0, classBytes.length, null);
         }
 
         /**
@@ -1637,7 +1638,7 @@ public final class ReflectionUtils {
         @SuppressWarnings("UnusedReturnValue")
         private Class<?> defineAndLoad(byte[] classBytes) {
             try {
-                return Class.forName(define(classBytes).getName(), true, this);
+                return Class.forName(this.define(classBytes).getName(), true, this);
             } catch (ClassNotFoundException e) {
                 throw new IllegalStateException(e); // This should never happen
             }
@@ -1681,7 +1682,7 @@ public final class ReflectionUtils {
          * @return the bytes of the generated injector class
          */
         private static byte[] generateIn(final String packageName) {
-            final String fullClassName = packageName + "/" + INJECTOR_CLASS_NAME;
+            final String fullClassName = packageName + "/" + InjectorGenerator.INJECTOR_CLASS_NAME;
             final String descriptor = "L" + fullClassName + ";";
             final String ownPackageName = InjectorGenerator.class.getPackageName();
 
@@ -1936,7 +1937,7 @@ public final class ReflectionUtils {
             } catch (IllegalCallerException ignored) {
 
             }
-            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.InjectorGenerator.class) + callerBlame);
+            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.InjectorGenerator.class) + callerBlame);
         }
     }
 
@@ -1994,11 +1995,11 @@ public final class ReflectionUtils {
         private SharedSecretsBridge() {
             String callerBlame = "";
             try {
-                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
+                callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
-            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.SharedSecretsBridge.class) + callerBlame);
+            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.SharedSecretsBridge.class) + callerBlame);
         }
     }
 
