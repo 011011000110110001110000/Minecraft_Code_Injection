@@ -16,9 +16,7 @@ import java.lang.reflect.*;
 import java.util.*;
 
 /**
- * <b>WIP</b> <br>
- * TODO: documentation, more helpers for internal methods, <br>
- * A collection of hacks for easier / enhanced usage of the reflection and invocation APIs. <br>
+ * A collection of hacks for easier / enhanced usage of the reflection and invocation APIs.
  *
  * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
  */
@@ -57,8 +55,8 @@ public final class ReflectionUtils {
 
         STACK_WALKER = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
-        // ModuleHelper needs to be initialized before the other helper classes
-        ModuleHelper.bootstrap();
+        // SharedSecretsBridge needs to be initialized before any of the other internals
+        SharedSecretsBridge.bootstrap();
 
         final String className = Class.class.getName();
         VarHandle tempReflectionCacheHandle;
@@ -440,18 +438,66 @@ public final class ReflectionUtils {
         }
     }
 
+    /**
+     * Produces a method handle for a virtual method. <br>
+     * See the documentation for {@link MethodHandles.Lookup#findVirtual(Class, String, MethodType)} for details.
+     *
+     * @param owner          The class or interface from which the method is accessed
+     * @param name           The name of the method
+     * @param returnType     The return type of the method
+     * @param parameterTypes The parameter types of the method, in order
+     * @return the desired method handle
+     * @throws ReflectiveOperationException if the method does not exist, if access checking fails, if the method is {@code static},
+     *                                      or if the method's variable arity modifier bit is set and {@link MethodHandle#asVarargsCollector(Class)} fails
+     * @see #findVirtual(Class, String, MethodType)
+     */
     public static MethodHandle findVirtual(Class<?> owner, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
         return findVirtual(owner, name, MethodType.methodType(returnType, parameterTypes));
     }
 
+    /**
+     * Produces a method handle for a virtual method. <br>
+     * See the documentation for {@link MethodHandles.Lookup#findVirtual(Class, String, MethodType)} for details.
+     *
+     * @param owner The class or interface from which the method is accessed
+     * @param name  The name of the method
+     * @param type  The type of the method, with the receiver argument omitted
+     * @return the desired method handle
+     * @throws ReflectiveOperationException if the method does not exist, if access checking fails, if the method is {@code static},
+     *                                      or if the method's variable arity modifier bit is set and {@link MethodHandle#asVarargsCollector(Class)} fails
+     */
     public static MethodHandle findVirtual(Class<?> owner, String name, MethodType type) throws ReflectiveOperationException {
         return MethodHandleHelper.findVirtual(owner, name, type);
     }
 
+    /**
+     * Produces a method handle for a virtual method, bound to the given {@code instance}. <br>
+     * See the documentation for {@link MethodHandles.Lookup#findVirtual(Class, String, MethodType)} for details.
+     *
+     * @param owner          The class or interface from which the method is accessed
+     * @param name           The name of the method
+     * @param returnType     The return type of the method
+     * @param parameterTypes The parameter types of the method, in order
+     * @return the desired method handle
+     * @throws ReflectiveOperationException if the method does not exist, if access checking fails, if the method is {@code static},
+     *                                      or if the method's variable arity modifier bit is set and {@link MethodHandle#asVarargsCollector(Class)} fails
+     * @see #findVirtualAndBind(Class, Object, String, MethodType)
+     */
     public static <O, T extends O> MethodHandle findVirtualAndBind(Class<T> owner, O instance, String name, Class<?> returnType, Class<?>... parameterTypes) throws ReflectiveOperationException {
         return findVirtualAndBind(owner, instance, name, MethodType.methodType(returnType, parameterTypes));
     }
 
+    /**
+     * Produces a method handle for a virtual method, bound to the given {@code instance}. <br>
+     * See the documentation for {@link MethodHandles.Lookup#findVirtual(Class, String, MethodType)} for details.
+     *
+     * @param owner The class or interface from which the method is accessed
+     * @param name  The name of the method
+     * @param type  The type of the method, with the receiver argument omitted
+     * @return the desired method handle
+     * @throws ReflectiveOperationException if the method does not exist, if access checking fails, if the method is {@code static},
+     *                                      or if the method's variable arity modifier bit is set and {@link MethodHandle#asVarargsCollector(Class)} fails
+     */
     public static <O, T extends O> MethodHandle findVirtualAndBind(Class<T> owner, O instance, String name, MethodType type) throws ReflectiveOperationException {
         return findVirtual(owner, name, type).bindTo(instance);
     }
@@ -1238,16 +1284,8 @@ public final class ReflectionUtils {
          * @see #getControllerForLayer(ModuleLayer)
          */
         private static final Constructor<ModuleLayer.Controller> LAYER_CONTROLLER_CONSTRUCTOR;
-        /**
-         * The {@link jdk.internal.access.JavaLangAccess} instance
-         */
-        private static final JavaLangAccess JAVA_LANG_ACCESS;
 
         static {
-
-            gainInternalAccess();
-
-            JAVA_LANG_ACCESS = jdk.internal.access.SharedSecrets.getJavaLangAccess();
 
             // Open the java.lang package to this class' module, so that we can freely invoke Constructor#setAccessible(boolean) on the ModuleLayer.Controller constructor
             addOpens(ModuleLayer.Controller.class.getModule(), ModuleLayer.Controller.class.getPackageName(), ModuleHelper.class.getModule());
@@ -1277,7 +1315,7 @@ public final class ReflectionUtils {
          * @param target      The module the package is to be exported to
          */
         private static void addExports(Module source, String packageName, Module target) {
-            JAVA_LANG_ACCESS.addExports(source, packageName, target);
+            SharedSecretsBridge.JAVA_LANG_ACCESS.addExports(source, packageName, target);
         }
 
         /**
@@ -1289,7 +1327,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addExportsToAllUnnamed(Module source, String packageName) {
-            JAVA_LANG_ACCESS.addExportsToAllUnnamed(source, packageName);
+            SharedSecretsBridge.JAVA_LANG_ACCESS.addExportsToAllUnnamed(source, packageName);
         }
 
         /**
@@ -1301,7 +1339,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addExports(Module source, String packageName) {
-            JAVA_LANG_ACCESS.addExports(source, packageName);
+            SharedSecretsBridge.JAVA_LANG_ACCESS.addExports(source, packageName);
         }
 
         /**
@@ -1314,7 +1352,7 @@ public final class ReflectionUtils {
          * @param target      The module the package is to be opened to
          */
         private static void addOpens(Module source, String packageName, Module target) {
-            JAVA_LANG_ACCESS.addOpens(source, packageName, target);
+            SharedSecretsBridge.JAVA_LANG_ACCESS.addOpens(source, packageName, target);
         }
 
         /**
@@ -1326,7 +1364,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addOpensToAllUnnamed(Module source, String packageName) {
-            JAVA_LANG_ACCESS.addOpensToAllUnnamed(source, packageName);
+            SharedSecretsBridge.JAVA_LANG_ACCESS.addOpensToAllUnnamed(source, packageName);
         }
 
         /**
@@ -1418,14 +1456,6 @@ public final class ReflectionUtils {
         }
 
         /**
-         * This method is only used to trigger initialization for this class.
-         * In of itself, this method is a no-op.
-         */
-        private static void bootstrap() {
-            // NO-OP
-        }
-
-        /**
          * Produces a {@link ModuleLayer.Controller} instance that controls the layer the given module belongs to.
          *
          * @param module The module whose layer is to be controlled
@@ -1453,37 +1483,6 @@ public final class ReflectionUtils {
                 return LAYER_CONTROLLER_CONSTRUCTOR.newInstance(layer);
             } catch (ReflectiveOperationException roe) {
                 throw new RuntimeException("Could not create a new instance of " + getModuleInclusiveClassName(ModuleLayer.Controller.class), roe);
-            }
-        }
-
-        /**
-         * Exploits the Proxy API to gain access to the {@link jdk.internal.access} package,
-         * which is normally restricted for classes outside the {@code java.base} module.
-         */
-        @SuppressWarnings("SuspiciousInvocationHandlerImplementation")
-        private static void gainInternalAccess() {
-            final String javaLangAccessName = "jdk.internal.access.JavaLangAccess";
-            final Class<?> javaLangAccessInterface;
-            final Class<?> injectorClass;
-            final InjectorClassLoader injectorLoader = new InjectorClassLoader();
-
-            try {
-                javaLangAccessInterface = Class.forName(javaLangAccessName);
-
-                final Object proxyInstance = Proxy.newProxyInstance(
-                        injectorLoader,
-                        new Class[]{
-                                javaLangAccessInterface
-                        },
-                        (proxy, method, arguments) -> null
-                );
-
-                final String packageName = proxyInstance.getClass().getPackageName().replace(".", "/");
-
-                injectorLoader.defineAndLoad(InjectorGenerator.generateIn(packageName));
-
-            } catch (ReflectiveOperationException roe) {
-                throw new RuntimeException("Could not gain access to the jdk.internal.access package", roe);
             }
         }
 
@@ -1931,6 +1930,76 @@ public final class ReflectionUtils {
 
             }
             throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.InjectorGenerator.class) + callerBlame);
+        }
+    }
+
+    /**
+     * Helper class that serves as a bridge between {@link ReflectionUtils} (and its internals) and {@link jdk.internal.access.SharedSecrets}.
+     */
+    private static final class SharedSecretsBridge {
+        /**
+         * The {@link JavaLangAccess} instance
+         */
+        private static final jdk.internal.access.JavaLangAccess JAVA_LANG_ACCESS;
+
+        static {
+
+            SharedSecretsBridge.gainInternalAccess();
+
+            JAVA_LANG_ACCESS = jdk.internal.access.SharedSecrets.getJavaLangAccess();
+
+        }
+
+        /**
+         * This method is only used to trigger initialization for this class.
+         * In of itself, this method is a no-op.
+         */
+        private static void bootstrap() {
+            // NO-OP
+        }
+
+        /**
+         * Exploits the Proxy API to gain access to the {@link jdk.internal.access} package,
+         * which is normally prohibited to classes outside the {@code java.base} module.
+         */
+        @SuppressWarnings("SuspiciousInvocationHandlerImplementation")
+        private static void gainInternalAccess() {
+            final String javaLangAccessName = "jdk.internal.access.JavaLangAccess";
+            final Class<?> javaLangAccessInterface;
+            final Class<?> injectorClass;
+            final InjectorClassLoader injectorLoader = new InjectorClassLoader();
+
+            try {
+                javaLangAccessInterface = Class.forName(javaLangAccessName);
+
+                final Object proxyInstance = Proxy.newProxyInstance(
+                        injectorLoader,
+                        new Class[]{
+                                javaLangAccessInterface
+                        },
+                        (proxy, method, arguments) -> null
+                );
+
+                final String packageName = proxyInstance.getClass().getPackageName().replace(".", "/");
+
+                injectorLoader.defineAndLoad(InjectorGenerator.generateIn(packageName));
+
+            } catch (ReflectiveOperationException roe) {
+                throw new RuntimeException("Could not gain access to the jdk.internal.access package", roe);
+            }
+        }
+
+        /**
+         * Private constructor to prevent instantiation.
+         */
+        private SharedSecretsBridge() {
+            String callerBlame = "";
+            try {
+                callerBlame = " by " + getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
+            } catch (IllegalCallerException ignored) {
+
+            }
+            throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.SharedSecretsBridge.class) + callerBlame);
         }
     }
 
