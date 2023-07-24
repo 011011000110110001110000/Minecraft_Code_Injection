@@ -35,7 +35,8 @@ public class ReflectionUtilsTest {
         fields = forTest.getDeclaredFields();
         Assertions.assertEquals(0, fields.length);
 
-        ReflectionUtils.clearReflectionFiltersAndCacheForClass(forTest);
+        ReflectionUtils.clearReflectionFiltersForClass(forTest);
+        ReflectionUtils.clearReflectionCacheForClass(forTest);
 
         fields = forTest.getDeclaredFields();
         Assertions.assertNotEquals(0, fields.length);

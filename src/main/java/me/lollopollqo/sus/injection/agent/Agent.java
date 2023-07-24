@@ -73,15 +73,15 @@ public class Agent {
         Class<?> MinecraftClass = ReflectionUtils.loadClass("emh");
         Class<?> ComponentClass = ReflectionUtils.loadClass("tj");
 
-        Method literal = ReflectionUtils.forceGetDeclaredMethodWithUnsafe(ComponentClass, "b", String.class);
+        Method literal = ReflectionUtils.getAccessibleDeclaredMethod(ComponentClass, "b", String.class);
         Object textComponent = literal.invoke(ComponentClass, message);
 
-        Object instance = ReflectionUtils.forceGetDeclaredFieldWithUnsafe(MinecraftClass, "F").get(MinecraftClass);
+        Object instance = ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "F").get(MinecraftClass);
 
-        Object player = ReflectionUtils.forceGetDeclaredFieldWithUnsafe(MinecraftClass, "t").get(instance);
+        Object player = ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "t").get(instance);
 
         if (player != null) {
-            Method sendSystemMessage = ReflectionUtils.forceGetDeclaredMethodWithUnsafe(player.getClass(), "a", ComponentClass);
+            Method sendSystemMessage = ReflectionUtils.getAccessibleDeclaredMethod(player.getClass(), "a", ComponentClass);
             sendSystemMessage.invoke(player, textComponent);
         } else {
             System.err.println("Could not find player! Make sure you have joined a world.");
