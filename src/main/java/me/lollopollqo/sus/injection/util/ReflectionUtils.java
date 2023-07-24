@@ -55,8 +55,8 @@ public final class ReflectionUtils {
 
         STACK_WALKER = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
-        // SharedSecretsBridge needs to be initialized before any of the other internals
-        SharedSecretsBridge.bootstrap();
+        // ModuleHelper needs to be initialized before the other helper classes
+        ModuleHelper.bootstrap();
 
         final String className = Class.class.getName();
         VarHandle tempReflectionCacheHandle;
@@ -1499,6 +1499,13 @@ public final class ReflectionUtils {
             throw new UnsupportedOperationException("Instantiation attempted for " + getModuleInclusiveClassName(ReflectionUtils.ModuleHelper.class) + callerBlame);
         }
 
+        /**
+         * This method is only used to trigger initialization for this class.
+         * In of itself, this method is a no-op.
+         */
+        private static void bootstrap() {
+            // NO-OP
+        }
     }
 
     /**
@@ -1948,14 +1955,6 @@ public final class ReflectionUtils {
 
             JAVA_LANG_ACCESS = jdk.internal.access.SharedSecrets.getJavaLangAccess();
 
-        }
-
-        /**
-         * This method is only used to trigger initialization for this class.
-         * In of itself, this method is a no-op.
-         */
-        private static void bootstrap() {
-            // NO-OP
         }
 
         /**
