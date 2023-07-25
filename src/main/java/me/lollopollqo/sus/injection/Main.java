@@ -27,7 +27,7 @@ public class Main {
 
     public static void main(String[] args) throws RemoteException {
         Thread.currentThread().setName("Main Injector Thread");
-        String agentPath;
+        final String agentPath;
 
         try {
             agentPath = new File(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getAbsolutePath();
@@ -54,7 +54,7 @@ public class Main {
             return;
         }
 
-        VirtualMachine vm;
+        final VirtualMachine vm;
 
         // Attach the agent
         try {

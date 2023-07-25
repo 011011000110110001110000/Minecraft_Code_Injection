@@ -70,18 +70,18 @@ public class Agent {
     }
 
     public static void sendSystemMessage(String message) throws Exception {
-        Class<?> MinecraftClass = ReflectionUtils.loadClass("emh");
-        Class<?> ComponentClass = ReflectionUtils.loadClass("tj");
+        final Class<?> MinecraftClass = ReflectionUtils.loadClass("emh");
+        final Class<?> ComponentClass = ReflectionUtils.loadClass("tj");
 
-        Method literal = ReflectionUtils.getAccessibleDeclaredMethod(ComponentClass, "b", String.class);
-        Object textComponent = literal.invoke(ComponentClass, message);
+        final Method literal = ReflectionUtils.getAccessibleDeclaredMethod(ComponentClass, "b", String.class);
+        final Object textComponent = literal.invoke(ComponentClass, message);
 
-        Object instance = ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "F").get(MinecraftClass);
+        final Object instance = ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "F").get(MinecraftClass);
 
-        Object player = ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "t").get(instance);
+        final Object player = ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "t").get(instance);
 
         if (player != null) {
-            Method sendSystemMessage = ReflectionUtils.getAccessibleDeclaredMethod(player.getClass(), "a", ComponentClass);
+            final Method sendSystemMessage = ReflectionUtils.getAccessibleDeclaredMethod(player.getClass(), "a", ComponentClass);
             sendSystemMessage.invoke(player, textComponent);
         } else {
             System.err.println("Could not find player! Make sure you have joined a world.");
