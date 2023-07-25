@@ -1682,8 +1682,8 @@ public final class ReflectionUtils {
          * @return the bytes of the generated injector class
          */
         private static byte[] generateIn(final String packageName) {
-            final String fullClassName = packageName + "/" + InjectorGenerator.INJECTOR_CLASS_NAME;
-            final String descriptor = "L" + fullClassName + ";";
+            final String fullInjectorClassName = packageName + "/" + InjectorGenerator.INJECTOR_CLASS_NAME;
+            final String injectorClassDescriptor = "L" + fullInjectorClassName + ";";
             final String ownPackageName = InjectorGenerator.class.getPackageName();
 
             final ClassWriter classWriter = new ClassWriter(0);
@@ -1692,7 +1692,7 @@ public final class ReflectionUtils {
             classWriter.visit(
                     Opcodes.V17,
                     Opcodes.ACC_SUPER,
-                    fullClassName,
+                    fullInjectorClassName,
                     null,
                     "java/lang/Object",
                     null
@@ -1733,7 +1733,7 @@ public final class ReflectionUtils {
 
                 methodVisitor.visitLocalVariable(
                         "this",
-                        descriptor,
+                        injectorClassDescriptor,
                         null,
                         l0,
                         l1,
@@ -1761,7 +1761,7 @@ public final class ReflectionUtils {
                 methodVisitor.visitLabel(l0);
 
                 methodVisitor.visitLdcInsn(
-                        Type.getType(descriptor)
+                        Type.getType(injectorClassDescriptor)
                 );
                 methodVisitor.visitVarInsn(
                         Opcodes.ASTORE,
