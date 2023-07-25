@@ -672,7 +672,7 @@ public final class ReflectionUtils {
      *
      * @param owner The class that declares the field
      * @param name  The field's name
-     * @param type  The field's type, of type {@code T}
+     * @param type  The field's type
      * @return a VarHandle giving access to non-static fields
      * @throws ReflectiveOperationException if the field cannot be found, can be found but is static, or if access checking fails
      */
@@ -687,7 +687,7 @@ public final class ReflectionUtils {
      *
      * @param owner The class that declares the static field
      * @param name  The field's name
-     * @param type  The field's type, of type {@code T}
+     * @param type  The field's type
      * @return a VarHandle giving access to a static field
      * @throws ReflectiveOperationException if the field cannot be found, can be found but is not static, or if access checking fails
      */
@@ -815,7 +815,7 @@ public final class ReflectionUtils {
     /**
      * Ensures the specified classes are initialized.
      *
-     * @param classes The classes whose initialization is to be ensured
+     * @param classes The classes to be initialized
      * @return an array containing the initialized classes
      * @see #ensureInitialized(Class)
      */
@@ -828,9 +828,9 @@ public final class ReflectionUtils {
     }
 
     /**
-     * Ensures the specified class is initialized.
+     * Ensures that {@code clazz} has been initialized.
      *
-     * @param clazz The class whose initialization is to be ensured
+     * @param clazz The class to be initialized
      * @return the initialized class
      */
     @NotNull
@@ -874,7 +874,7 @@ public final class ReflectionUtils {
     private static final class MethodHandleHelper {
 
         /**
-         * Internal helper for {@link ReflectionUtils#findGetter(Class, String, Class)}.
+         * Internal helper for {@link ReflectionUtils#findGetter(Class, String, Class)}
          * <p>
          * Produces a method handle giving read access to a non-static field. <br>
          * See the documentation for {@link MethodHandles.Lookup#findGetter(Class, String, Class)} for details.
@@ -890,7 +890,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#findStaticGetter(Class, String, Class)}.
+         * Internal helper for {@link ReflectionUtils#findStaticGetter(Class, String, Class)}
          * <p>
          * Produces a method handle giving read access to a static field. <br>
          * See the documentation for {@link MethodHandles.Lookup#findStaticGetter(Class, String, Class)} for details.
@@ -906,7 +906,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#findSetter(Class, String, Class)}.
+         * Internal helper for {@link ReflectionUtils#findSetter(Class, String, Class)}
          * <p>
          * Produces a method handle giving write access to a non-static field. <br>
          * See the documentation for {@link MethodHandles.Lookup#findSetter(Class, String, Class)} for details.
@@ -922,7 +922,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#findStaticSetter(Class, String, Class)}.
+         * Internal helper for {@link ReflectionUtils#findStaticSetter(Class, String, Class)}
          * <p>
          * Produces a method handle giving write access to a static field. <br>
          * See the documentation for {@link MethodHandles.Lookup#findStaticSetter(Class, String, Class)} for details.
@@ -938,7 +938,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#findVirtual(Class, String, MethodType)}.
+         * Internal helper for {@link ReflectionUtils#findVirtual(Class, String, MethodType)}
          * <p>
          * Produces a method handle for a virtual method. <br>
          * See the documentation for {@link MethodHandles.Lookup#findVirtual(Class, String, MethodType)} for details.
@@ -955,7 +955,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#findStatic(Class, String, MethodType)}.
+         * Internal helper for {@link ReflectionUtils#findStatic(Class, String, MethodType)}
          * <p>
          * Produces a method handle for a static method. <br>
          * See the documentation for {@link MethodHandles.Lookup#findStatic(Class, String, MethodType)} for details.
@@ -972,7 +972,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#findSpecial(Class, String, Class, MethodType)}.
+         * Internal helper for {@link ReflectionUtils#findSpecial(Class, String, Class, MethodType)}
          * <p>
          * Produces an early-bound method handle for a virtual method. <br>
          * It will bypass checks for overriding methods on the receiver, as if called from an {@code invokespecial} instruction
@@ -992,7 +992,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#findConstructor(Class, MethodType)}.
+         * Internal helper for {@link ReflectionUtils#findConstructor(Class, MethodType)}
          * <p>
          * Produces a method handle which creates an object and initializes it, using the constructor of the specified type. <br>
          * See the documentation for {@link MethodHandles.Lookup#findConstructor(Class, MethodType)} for details.
@@ -1008,7 +1008,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#unreflect(Method)}.
+         * Internal helper for {@link ReflectionUtils#unreflect(Method)}
          * <p>
          * Makes a direct method handle to m. <br>
          * See the documentation for {@link MethodHandles.Lookup#unreflect(Method)} for details.
@@ -1023,7 +1023,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#unreflectSpecial(Method, Class)}.
+         * Internal helper for {@link ReflectionUtils#unreflectSpecial(Method, Class)}
          * <p>
          * Produces a method handle for a reflected method. <br>
          * It will bypass checks for overriding methods on the receiver, as if called
@@ -1041,7 +1041,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#unreflectConstructor(Constructor)}.
+         * Internal helper for {@link ReflectionUtils#unreflectConstructor(Constructor)}
          * <p>
          * Produces a method handle for a reflected constructor. <br>
          * See the documentation for {@link MethodHandles.Lookup#unreflectConstructor(Constructor)} for details.
@@ -1056,7 +1056,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#unreflectGetter(Field)}.
+         * Internal helper for {@link ReflectionUtils#unreflectGetter(Field)}
          * <p>
          * Produces a method handle giving read access to a reflected field. <br>
          * See the documentation for {@link MethodHandles.Lookup#unreflectGetter(Field)} for details.
@@ -1070,7 +1070,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#unreflectSetter(Field)}.
+         * Internal helper for {@link ReflectionUtils#unreflectSetter(Field)}
          * <p>
          * Produces a method handle giving write access to a reflected field. <br>
          * See the documentation for {@link MethodHandles.Lookup#unreflectSetter(Field)} for details.
@@ -1106,7 +1106,7 @@ public final class ReflectionUtils {
     private static final class VarHandleHelper {
 
         /**
-         * Internal helper for {@link ReflectionUtils#findVarHandle(Class, String, Class)}.
+         * Internal helper for {@link ReflectionUtils#findVarHandle(Class, String, Class)}
          * <p>
          * Produces a VarHandle giving access to a non-static field {@code name} of
          * type {@code type} declared in a class of type {@code owner}. <br>
@@ -1114,7 +1114,7 @@ public final class ReflectionUtils {
          *
          * @param owner The class that declares the field
          * @param name  The field's name
-         * @param type  The field's type, of type {@code T}
+         * @param type  The field's type
          * @return a VarHandle giving access to non-static fields
          * @throws ReflectiveOperationException if the field cannot be found, can be found but is static, or if access checking fails
          */
@@ -1123,7 +1123,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#findStaticVarHandle(Class, String, Class)}.
+         * Internal helper for {@link ReflectionUtils#findStaticVarHandle(Class, String, Class)}
          * <p>
          * Produces a VarHandle giving access to a static field {@code name} of
          * type {@code type} declared in a class of type {@code owner}. <br>
@@ -1131,7 +1131,7 @@ public final class ReflectionUtils {
          *
          * @param owner The class that declares the static field
          * @param name  The field's name
-         * @param type  The field's type, of type {@code T}
+         * @param type  The field's type
          * @return a VarHandle giving access to a static field
          * @throws ReflectiveOperationException if the field cannot be found, can be found but is not static, or if access checking fails
          */
@@ -1140,7 +1140,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#unreflectVarHandle(Field)}.
+         * Internal helper for {@link ReflectionUtils#unreflectVarHandle(Field)}
          * <p>
          * Produces a VarHandle giving access to a reflected field {@code f}. <br>
          * See the documentation for {@link MethodHandles.Lookup#unreflectVarHandle(Field)} for details.
@@ -1205,9 +1205,11 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Ensures the specified class is initialized.
+         * Internal helper for {@link ReflectionUtils#ensureInitialized(Class)}
+         * <p>
+         * Ensures that {@code clazz} has been initialized.
          *
-         * @param clazz the class whose initialization is to be ensured
+         * @param clazz The class to be initialized
          * @return the initialized class
          */
         private static <T> Class<T> ensureInitialized(Class<T> clazz) throws IllegalAccessException {
@@ -1218,7 +1220,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Produces a trusted {@link MethodHandles.Lookup} instance with the given {@code lookupClass} and a null {@code previousLookupClass}.
+         * Produces a trusted {@link MethodHandles.Lookup} instance with the given {@code lookupClass} and a {@code null} {@code previousLookupClass}.
          *
          * @param lookupClass The desired lookup class
          * @return the created {@code Lookup} object
@@ -1288,7 +1290,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#addExports(Module, String, Module)}.
+         * Internal helper for {@link ReflectionUtils#addExports(Module, String, Module)}
          * <p>
          * Exports the package with the given name from the {@code source} module to the {@code target} module.
          *
@@ -1301,7 +1303,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#addExportsToAllUnnamed(Module, String)}.
+         * Internal helper for {@link ReflectionUtils#addExportsToAllUnnamed(Module, String)}
          * <p>
          * Exports the package with the given name from the {@code source} module to all unnamed modules.
          *
@@ -1313,7 +1315,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#addExports(Module, String)}.
+         * Internal helper for {@link ReflectionUtils#addExports(Module, String)}
          * <p>
          * Exports the package with the given name from the {@code source} module to all modules.
          *
@@ -1325,7 +1327,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#addOpens(Module, String, Module)}.
+         * Internal helper for {@link ReflectionUtils#addOpens(Module, String, Module)}
          * <p>
          * Opens the package with the given name from the {@code source} module to the {@code target} module.
          *
@@ -1338,7 +1340,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#addOpensToAllUnnamed(Module, String)}.
+         * Internal helper for {@link ReflectionUtils#addOpensToAllUnnamed(Module, String)}
          * <p>
          * Opens the package with the given name from the {@code source} module to all unnamed modules.
          *
@@ -1350,7 +1352,7 @@ public final class ReflectionUtils {
         }
 
         /**
-         * Internal helper for {@link ReflectionUtils#addOpens(Module, String)}.
+         * Internal helper for {@link ReflectionUtils#addOpens(Module, String)}
          * <p>
          * Opens the package with the given name from the {@code source} module to all modules.
          *
@@ -1499,7 +1501,7 @@ public final class ReflectionUtils {
     private static class InjectorClassLoader extends ClassLoader {
         /**
          * Private constructor. <br>
-         * Only meant to be used by {@link ModuleHelper}.
+         * Only meant to be used by {@link JavaLangAccessBridge}.
          */
         private InjectorClassLoader() {
             super(InjectorClassLoader.class.getClassLoader());
@@ -1835,49 +1837,49 @@ public final class ReflectionUtils {
      */
     private static final class JavaLangAccessBridge {
         /**
-         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addExports(Module, String, Module)}
+         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#addExports(Module, String, Module)}
          *
          * @see JavaLangAccessBridge#addExports(Module, String, Module)
          */
         private static final MethodHandle addExportsToModule;
         /**
-         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addExportsToAllUnnamed(Module, String)}
+         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#addExportsToAllUnnamed(Module, String)}
          *
          * @see JavaLangAccessBridge#addExportsToAllUnnamed(Module, String)
          */
         private static final MethodHandle addExportsToAllUnnamedModules;
         /**
-         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addExports(Module, String)}
+         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#addExports(Module, String)}
          *
          * @see JavaLangAccessBridge#addExports(Module, String)
          */
         private static final MethodHandle addExportsToAllModules;
         /**
-         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addOpens(Module, String, Module)}
+         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#addOpens(Module, String, Module)}
          *
          * @see JavaLangAccessBridge#addOpens(Module, String, Module)
          */
         private static final MethodHandle addOpensToModule;
         /**
-         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addOpensToAllUnnamed(Module, String)}
+         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#addOpensToAllUnnamed(Module, String)}
          *
          * @see JavaLangAccessBridge#addOpensToAllUnnamed(Module, String)
          */
         private static final MethodHandle addOpensToAllUnnamedModules;
         /**
-         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccess(Module)}
+         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccess(Module)}
          *
          * @see JavaLangAccessBridge#addEnableNativeAccess(Module)
          */
         private static final MethodHandle addEnableNativeAccessToModule;
         /**
-         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccessAllUnnamed()}
+         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccessAllUnnamed()}
          *
          * @see JavaLangAccessBridge#addEnableNativeAccessAllUnnamed()
          */
         private static final MethodHandle addEnableNativeAccessToAllUnnamedModules;
         /**
-         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#isEnableNativeAccess(Module)}
+         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#isEnableNativeAccess(Module)}
          *
          * @see JavaLangAccessBridge#isEnableNativeAccess(Module)
          */
