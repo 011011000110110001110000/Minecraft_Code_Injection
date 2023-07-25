@@ -9,13 +9,13 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InaccessibleObjectException;
 import java.util.ArrayList;
 
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "FieldCanBeLocal", "FieldMayBeFinal"})
 public class ReflectionUtilsTest {
     static boolean dummyClassInitialized;
 
     @Test
     void testInit() throws Throwable {
-        Class<?> classReflectionUtils = Class.forName("me.lollopollqo.sus.injection.util.ReflectionUtils");
+        final Class<?> classReflectionUtils = Class.forName("me.lollopollqo.sus.injection.util.ReflectionUtils");
     }
 
     @Test
