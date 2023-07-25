@@ -16,7 +16,7 @@ import java.lang.reflect.*;
 import java.util.*;
 
 /**
- * A collection of hacks for easier / enhanced usage of the reflection and invocation APIs.
+ * A collection of hacks and utilities for easier / enhanced usage of the reflection and invocation APIs.
  *
  * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
  */
@@ -137,7 +137,7 @@ public final class ReflectionUtils {
      * @param name       The name of the method
      * @param paramTypes The types of the parameters of the method, in order
      * @return the {@link Method} with the specified owner, name and parameter types
-     * @throws NoSuchMethodException if a method with the specified name and parameter types could not be found in the specified class
+     * @throws NoSuchMethodException if a method with the specified name and parameter types could not be found in {@code owner}
      * @see #getAccessibleDeclaredMethodNoFilter(Class, String, Class[])
      * @see #setAccessible(AccessibleObject, boolean)
      */
