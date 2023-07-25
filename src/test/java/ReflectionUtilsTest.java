@@ -50,10 +50,7 @@ public class ReflectionUtilsTest {
 
         Assertions.assertFalse(serialVersionUID.isAccessible());
 
-        Assertions.assertThrowsExactly(
-                InaccessibleObjectException.class,
-                () -> serialVersionUID.setAccessible(true)
-        );
+        Assertions.assertFalse(serialVersionUID.trySetAccessible());
 
         Assertions.assertThrowsExactly(
                 InaccessibleObjectException.class,
