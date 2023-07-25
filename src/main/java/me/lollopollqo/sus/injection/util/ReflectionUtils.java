@@ -271,28 +271,12 @@ public final class ReflectionUtils {
      *
      * @param object     The object whose accessibility is to be forcefully set
      * @param accessible The accessibility to be forcefully set
-     * @see #unsafeSetAccessible(AccessibleObject, boolean)
      */
     public static void setAccessible(AccessibleObject object, boolean accessible) {
         try {
             setAccessibleHandle.invoke(object, accessible);
         } catch (Throwable t) {
             throw new RuntimeException("Could not force the accessibility of " + object + " to be set to " + accessible, t);
-        }
-    }
-
-    /**
-     * Forces the given {@link AccessibleObject} instance to have the desired accessibility by using {@link jdk.internal.misc.Unsafe},
-     * bypassing access checks.
-     *
-     * @param object     The object whose accessibility is to be forcefully set
-     * @param accessible The accessibility to be forcefully set
-     */
-    public static void unsafeSetAccessible(AccessibleObject object, boolean accessible) {
-        try {
-            UnsafeHelper.unsafeSetAccessible(object, accessible);
-        } catch (Throwable e) {
-            throw new RuntimeException("Could not force the accessibility of " + object + " to be set to " + accessible, e);
         }
     }
 
@@ -1507,102 +1491,6 @@ public final class ReflectionUtils {
             throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.ModuleHelper.class) + callerBlame);
         }
 
-    }
-
-    /**
-     * Helper class that holds references to the {@link sun.misc.Unsafe} and {@link jdk.internal.misc.Unsafe} instances. <br>
-     * This class also contains a few methods that make working with the two <code>Unsafe</code> classes easier.
-     *
-     * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
-     */
-    private static final class UnsafeHelper {
-        /**
-         * The {@link sun.misc.Unsafe} instance
-         */
-        private static final sun.misc.Unsafe UNSAFE;
-        /**
-         * The {@link jdk.internal.misc.Unsafe} instance
-         */
-        private static final jdk.internal.misc.Unsafe INTERNAL_UNSAFE;
-        /**
-         * The cached offset (in bytes) of the {@link AccessibleObject#override} field in an {@link AccessibleObject} instance
-         */
-        private static final long OVERRIDE_OFFSET;
-
-        static {
-
-            ModuleHelper.addExports(Object.class.getModule(), "jdk.internal.misc", UnsafeHelper.class.getModule());
-
-            UNSAFE = UnsafeHelper.findUnsafe();
-            INTERNAL_UNSAFE = jdk.internal.misc.Unsafe.getUnsafe();
-
-            // Bypass reflection filters by using the jdk.internal.misc.Unsafe instance
-            OVERRIDE_OFFSET = INTERNAL_UNSAFE.objectFieldOffset(AccessibleObject.class, "override");
-
-        }
-
-        /**
-         * Internal helper for {@link ReflectionUtils#unsafeSetAccessible(AccessibleObject, boolean)}.
-         * <p>
-         * Forces the given {@link AccessibleObject} instance to have the desired accessibility. <br>
-         * Unlike {@link AccessibleObject#setAccessible(boolean)}, this method does not perform any permission checks.
-         *
-         * @param object     The object whose accessibility is to be forcefully set
-         * @param accessible the accessibility to be forcefully set
-         * @implNote As the name of the method suggests, this makes use of {@link jdk.internal.misc.Unsafe} to bypass any access checks.
-         */
-        @SuppressWarnings("SameParameterValue")
-        private static void unsafeSetAccessible(AccessibleObject object, boolean accessible) {
-            INTERNAL_UNSAFE.putBoolean(object, OVERRIDE_OFFSET, accessible);
-        }
-
-        /**
-         * Gets a reference to the {@link sun.misc.Unsafe} instance without relying on the field name.
-         *
-         * @return the {@link sun.misc.Unsafe} instance
-         */
-        private static sun.misc.Unsafe findUnsafe() {
-            final int unsafeFieldModifiers = Modifier.STATIC | Modifier.FINAL;
-            final List<Throwable> exceptions = new ArrayList<>();
-
-            // We cannot rely on the field name, as it is an implementation detail and as such it can be different from vendor to vendor
-            for (Field field : sun.misc.Unsafe.class.getDeclaredFields()) {
-
-                // Verify that the field is of the correct type and has the correct access modifiers
-                if (field.getType() != sun.misc.Unsafe.class || (field.getModifiers() & unsafeFieldModifiers) != unsafeFieldModifiers) {
-                    continue;
-                }
-
-                try {
-                    // We don't need to do anything fancy to set the field to be accessible
-                    // since the jdk.unsupported module opens the sun.misc package to all modules
-                    field.setAccessible(true);
-                    if (field.get(null) instanceof sun.misc.Unsafe unsafe) {
-                        return unsafe;
-                    }
-                } catch (Throwable e) {
-                    exceptions.add(e);
-                }
-            }
-
-            // If we couldn't find the field, throw an exception
-            final RuntimeException exception = new RuntimeException("Could not find sun.misc.Unsafe instance!");
-            exceptions.forEach(exception::addSuppressed);
-            throw exception;
-        }
-
-        /**
-         * Private constructor to prevent instantiation.
-         */
-        private UnsafeHelper() {
-            String callerBlame = "";
-            try {
-                callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
-            } catch (IllegalCallerException ignored) {
-
-            }
-            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.UnsafeHelper.class) + callerBlame);
-        }
     }
 
     /**
