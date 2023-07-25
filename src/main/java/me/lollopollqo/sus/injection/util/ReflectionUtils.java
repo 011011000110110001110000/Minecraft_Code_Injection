@@ -5,8 +5,6 @@ import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.*;
 
-import jdk.internal.access.JavaLangAccess;
-
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -1299,7 +1297,7 @@ public final class ReflectionUtils {
          * @param target      The module the package is to be exported to
          */
         private static void addExports(Module source, String packageName, Module target) {
-            SharedSecretsBridge.JAVA_LANG_ACCESS.addExports(source, packageName, target);
+            JavaLangAccessBridge.addExports(source, packageName, target);
         }
 
         /**
@@ -1311,7 +1309,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addExportsToAllUnnamed(Module source, String packageName) {
-            SharedSecretsBridge.JAVA_LANG_ACCESS.addExportsToAllUnnamed(source, packageName);
+            JavaLangAccessBridge.addExportsToAllUnnamed(source, packageName);
         }
 
         /**
@@ -1323,7 +1321,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addExports(Module source, String packageName) {
-            SharedSecretsBridge.JAVA_LANG_ACCESS.addExports(source, packageName);
+            JavaLangAccessBridge.addExports(source, packageName);
         }
 
         /**
@@ -1336,7 +1334,7 @@ public final class ReflectionUtils {
          * @param target      The module the package is to be opened to
          */
         private static void addOpens(Module source, String packageName, Module target) {
-            SharedSecretsBridge.JAVA_LANG_ACCESS.addOpens(source, packageName, target);
+            JavaLangAccessBridge.addOpens(source, packageName, target);
         }
 
         /**
@@ -1348,7 +1346,7 @@ public final class ReflectionUtils {
          * @param packageName The name of the package
          */
         private static void addOpensToAllUnnamed(Module source, String packageName) {
-            SharedSecretsBridge.JAVA_LANG_ACCESS.addOpensToAllUnnamed(source, packageName);
+            JavaLangAccessBridge.addOpensToAllUnnamed(source, packageName);
         }
 
         /**
@@ -1830,20 +1828,238 @@ public final class ReflectionUtils {
     }
 
     /**
-     * Helper class that serves as a bridge between {@link ReflectionUtils} (and its internals) and {@link jdk.internal.access.SharedSecrets}.
+     * Helper class that serves as a bridge between {@link ReflectionUtils} (and its internals) and {@link jdk.internal.access.JavaLangAccess}. <br>
+     * The purpose of this class is to get rid of the need to export the "jdk.internal.access" package to this class' module at compile time.
+     *
+     * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
-    private static final class SharedSecretsBridge {
+    private static final class JavaLangAccessBridge {
         /**
-         * The {@link JavaLangAccess} instance
+         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addExports(Module, String, Module)}
+         *
+         * @see JavaLangAccessBridge#addExports(Module, String, Module)
          */
-        private static final jdk.internal.access.JavaLangAccess JAVA_LANG_ACCESS;
+        private static final MethodHandle addExportsToModule;
+        /**
+         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addExportsToAllUnnamed(Module, String)}
+         *
+         * @see JavaLangAccessBridge#addExportsToAllUnnamed(Module, String)
+         */
+        private static final MethodHandle addExportsToAllUnnamedModules;
+        /**
+         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addExports(Module, String)}
+         *
+         * @see JavaLangAccessBridge#addExports(Module, String)
+         */
+        private static final MethodHandle addExportsToAllModules;
+        /**
+         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addOpens(Module, String, Module)}
+         *
+         * @see JavaLangAccessBridge#addOpens(Module, String, Module)
+         */
+        private static final MethodHandle addOpensToModule;
+        /**
+         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addOpensToAllUnnamed(Module, String)}
+         *
+         * @see JavaLangAccessBridge#addOpensToAllUnnamed(Module, String)
+         */
+        private static final MethodHandle addOpensToAllUnnamedModules;
+        /**
+         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccess(Module)}
+         *
+         * @see JavaLangAccessBridge#addEnableNativeAccess(Module)
+         */
+        private static final MethodHandle addEnableNativeAccessToModule;
+        /**
+         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccessAllUnnamed()}
+         *
+         * @see JavaLangAccessBridge#addEnableNativeAccessAllUnnamed()
+         */
+        private static final MethodHandle addEnableNativeAccessToAllUnnamedModules;
+        /**
+         * Cached method handle for {@link jdk.internal.access.JavaLangAccess#isEnableNativeAccess(Module)}
+         *
+         * @see JavaLangAccessBridge#isEnableNativeAccess(Module)
+         */
+        private static final MethodHandle isEnableNativeAccess;
 
         static {
 
-            SharedSecretsBridge.gainInternalAccess();
+            JavaLangAccessBridge.gainInternalAccess();
 
-            JAVA_LANG_ACCESS = jdk.internal.access.SharedSecrets.getJavaLangAccess();
+            final String sharedSecretsClassName = "jdk.internal.access.SharedSecrets";
+            final String javaLangAccessClassName = "jdk.internal.access.JavaLangAccess";
+            final Class<?> sharedSecretsClass;
+            final Class<?> javaLangAccessClass;
 
+            try {
+                sharedSecretsClass = Class.forName(sharedSecretsClassName);
+            } catch (ClassNotFoundException cnfe) {
+                throw new RuntimeException("Could not find " + sharedSecretsClassName, cnfe);
+            }
+
+            try {
+                javaLangAccessClass = Class.forName(javaLangAccessClassName);
+            } catch (ClassNotFoundException cnfe) {
+                throw new RuntimeException("Could not find " + javaLangAccessClassName, cnfe);
+            }
+
+            final MethodHandles.Lookup lookup = MethodHandles.lookup();
+            final MethodHandle getJavaLangAccessHandle;
+
+            try {
+                getJavaLangAccessHandle = lookup.findStatic(sharedSecretsClass, "getJavaLangAccess", MethodType.methodType(javaLangAccessClass));
+            } catch (ReflectiveOperationException roe) {
+                throw new RuntimeException("Could not get handle for ", roe);
+            }
+
+            final Object javaLangAccessInstance;
+
+            try {
+                javaLangAccessInstance = getJavaLangAccessHandle.invoke();
+            } catch (Throwable t) {
+                throw new RuntimeException("Could not obtain the " + javaLangAccessClassName + " instance", t);
+            }
+
+            try {
+                addExportsToModule = lookup.findVirtual(javaLangAccessClass, "addExports", MethodType.methodType(void.class, Module.class, String.class, Module.class)).bindTo(javaLangAccessInstance);
+                addExportsToAllUnnamedModules = lookup.findVirtual(javaLangAccessClass, "addExportsToAllUnnamed", MethodType.methodType(void.class, Module.class, String.class)).bindTo(javaLangAccessInstance);
+                addExportsToAllModules = lookup.findVirtual(javaLangAccessClass, "addExports", MethodType.methodType(void.class, Module.class, String.class)).bindTo(javaLangAccessInstance);
+                addOpensToModule = lookup.findVirtual(javaLangAccessClass, "addOpens", MethodType.methodType(void.class, Module.class, String.class, Module.class)).bindTo(javaLangAccessInstance);
+                addOpensToAllUnnamedModules = lookup.findVirtual(javaLangAccessClass, "addOpensToAllUnnamed", MethodType.methodType(void.class, Module.class, String.class)).bindTo(javaLangAccessInstance);
+                addEnableNativeAccessToModule = lookup.findVirtual(javaLangAccessClass, "addEnableNativeAccess", MethodType.methodType(Module.class, Module.class)).bindTo(javaLangAccessInstance);
+                addEnableNativeAccessToAllUnnamedModules = lookup.findVirtual(javaLangAccessClass, "addEnableNativeAccessAllUnnamed", MethodType.methodType(void.class)).bindTo(javaLangAccessInstance);
+                isEnableNativeAccess = lookup.findVirtual(javaLangAccessClass, "isEnableNativeAccess", MethodType.methodType(boolean.class, Module.class)).bindTo(javaLangAccessInstance);
+            } catch (Throwable t) {
+                throw new RuntimeException("Could not obtain handles for the methods in " + javaLangAccessClassName, t);
+            }
+
+        }
+
+        /**
+         * Bridge method for {@link jdk.internal.access.JavaLangAccess#addExports(Module, String, Module)}
+         * <p>
+         * Updates module {@code m1} to export a package to module {@code m2}.
+         *
+         * @param m1  The module that contains the package
+         * @param pkg The name of the package to export
+         * @param m2  The module the package should be exported to
+         */
+        private static void addExports(Module m1, String pkg, Module m2) {
+            try {
+                addExportsToModule.invoke(m1, pkg, m2);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        /**
+         * Bridge method for {@link jdk.internal.access.JavaLangAccess#addExportsToAllUnnamed(Module, String)}
+         * <p>
+         * Updates module {@code m} to export a package to all unnamed modules.
+         *
+         * @param m   The module that contains the package
+         * @param pkg The name of the package to export
+         */
+        private static void addExportsToAllUnnamed(Module m, String pkg) {
+            try {
+                addExportsToAllUnnamedModules.invoke(m, pkg);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        /**
+         * Bridge method for {@link jdk.internal.access.JavaLangAccess#addExports(Module, String)}
+         * <p>
+         * Updates module {@code m} to export a package unconditionally.
+         *
+         * @param m   The module that contains the package
+         * @param pkg The name of the package to export
+         */
+        private static void addExports(Module m, String pkg) {
+            try {
+                addExportsToAllModules.invoke(m, pkg);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        /**
+         * Bridge method for {@link jdk.internal.access.JavaLangAccess#addOpens(Module, String, Module)}
+         * <p>
+         * Updates module {@code m1} to open a package to module {@code m2}.
+         *
+         * @param m1  The module that contains the package
+         * @param pkg The name of the package to open
+         * @param m2  The module to open the package to
+         */
+        private static void addOpens(Module m1, String pkg, Module m2) {
+            try {
+                addOpensToModule.invoke(m1, pkg, m2);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        /**
+         * Bridge method for {@link jdk.internal.access.JavaLangAccess#addOpensToAllUnnamed(Module, String)}.
+         * <p>
+         * Updates module {@code m} to open a package to all unnamed modules.
+         *
+         * @param m   The module that contains the package
+         * @param pkg The name of the package to open
+         */
+        private static void addOpensToAllUnnamed(Module m, String pkg) {
+            try {
+                addExportsToAllUnnamedModules.invoke(m, pkg);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        /**
+         * Bridge method for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccess(Module)}
+         * <p>
+         * Updates module {@code m} to allow access to restricted methods.
+         *
+         * @param m The module to update
+         */
+        private static void addEnableNativeAccess(Module m) {
+            try {
+                addEnableNativeAccessToModule.invoke(m);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        /**
+         * Bridge method for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccessAllUnnamed()}
+         * <p>
+         * Updates all unnamed modules to allow access to restricted methods.
+         */
+        private static void addEnableNativeAccessAllUnnamed() {
+            try {
+                addEnableNativeAccessToAllUnnamedModules.invoke();
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        /**
+         * Bridge method for {@link jdk.internal.access.JavaLangAccess#isEnableNativeAccess(Module)}
+         * <p>
+         * Checks whether module {@code m} can access restricted methods.
+         *
+         * @param m The module to check against
+         * @return {@code true} if {@code m} can access restricted methods, {@code false} otherwise
+         */
+        private static boolean isEnableNativeAccess(Module m) {
+            try {
+                return (boolean) isEnableNativeAccess.invoke(m);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
         }
 
         /**
@@ -1880,14 +2096,14 @@ public final class ReflectionUtils {
         /**
          * Private constructor to prevent instantiation.
          */
-        private SharedSecretsBridge() {
+        private JavaLangAccessBridge() {
             String callerBlame = "";
             try {
                 callerBlame = " by " + ReflectionUtils.getModuleInclusiveClassName(STACK_WALKER.getCallerClass());
             } catch (IllegalCallerException ignored) {
 
             }
-            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(ReflectionUtils.SharedSecretsBridge.class) + callerBlame);
+            throw new UnsupportedOperationException("Instantiation attempted for " + ReflectionUtils.getModuleInclusiveClassName(JavaLangAccessBridge.class) + callerBlame);
         }
     }
 

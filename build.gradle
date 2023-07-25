@@ -26,15 +26,6 @@ jar {
     }
 }
 
-compileJava {
-    options.compilerArgs += [
-            "--add-exports",
-            "java.base/jdk.internal.misc=SusInjection.main",
-            "--add-exports",
-            "java.base/jdk.internal.access=SusInjection.main"
-    ]
-}
-
 dependencies {
     implementation 'org.jetbrains:annotations:24.0.0'
     implementation 'org.ow2.asm:asm:9.5'
