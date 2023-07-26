@@ -1498,7 +1498,7 @@ public final class ReflectionUtils {
      *
      * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
-    private static class InjectorClassLoader extends ClassLoader {
+    private static final class InjectorClassLoader extends ClassLoader {
         /**
          * Private constructor. <br>
          * Only meant to be used by {@link JavaLangAccessBridge}.
@@ -1557,7 +1557,7 @@ public final class ReflectionUtils {
      *
      * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
-    private static class InjectorGenerator {
+    private static final class InjectorGenerator {
         /**
          * The name of the generated "injector" class
          */
@@ -1831,7 +1831,8 @@ public final class ReflectionUtils {
 
     /**
      * Helper class that serves as a bridge between {@link ReflectionUtils} (and its internals) and {@link jdk.internal.access.JavaLangAccess}. <br>
-     * The purpose of this class is to get rid of the need to export the "jdk.internal.access" package to this class' module at compile time.
+     * The purpose of this class is to get rid of the need to export the "jdk.internal.access" package to this class' module via the {@code --add-exports}
+     * argument at compile / run time.
      *
      * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
      */
