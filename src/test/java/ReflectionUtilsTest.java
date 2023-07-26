@@ -104,7 +104,7 @@ public class ReflectionUtilsTest {
         Assertions.assertEquals(privateFieldGetter.invoke(testObject), privateFieldField.get(testObject));
     }
 
-    private static class DummyClass {
+    private static final class DummyClass {
         static {
             dummyClassInitialized = true;
         }
