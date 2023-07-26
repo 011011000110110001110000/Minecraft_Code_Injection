@@ -2074,15 +2074,17 @@ public final class ReflectionUtils {
             final Class<?> javaLangAccessInterface;
             final Class<?> injectorClass;
             final InjectorClassLoader injectorLoader = new InjectorClassLoader();
+            final Class<?>[] interfaces;
 
             try {
                 javaLangAccessInterface = Class.forName(javaLangAccessName);
+                interfaces  = new Class[] {
+                        javaLangAccessInterface
+                };
 
                 final Object proxyInstance = Proxy.newProxyInstance(
                         injectorLoader,
-                        new Class[]{
-                                javaLangAccessInterface
-                        },
+                        interfaces,
                         (proxy, method, arguments) -> null
                 );
 
