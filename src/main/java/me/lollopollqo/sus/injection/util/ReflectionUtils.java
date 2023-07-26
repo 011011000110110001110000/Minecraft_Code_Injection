@@ -371,26 +371,26 @@ public final class ReflectionUtils {
     }
 
     /**
-     * Gets the value of the field with the specified {@code name} and {@code type} for the given object.
+     * Gets the value of the non-static field with the specified {@code name} and {@code type} for the given object.
      *
-     * @param owner The object that owns the field value
+     * @param instance The object that owns the field value
      * @param name  The name of the field
      * @param type  The type of the field
      * @return the value of the field for {@code owner}
      */
     @SuppressWarnings("unchecked")
-    public static <T> T getFieldValue(Object owner, String name, Class<T> type) {
+    public static <T> T getFieldValue(Object instance, String name, Class<T> type) {
         try {
-            return (T) ReflectionUtils.findGetter(owner.getClass(), name, type).invoke(owner);
+            return (T) ReflectionUtils.findGetter(instance.getClass(), name, type).invoke(instance);
         } catch (Throwable e) {
-            throw new RuntimeException("Failed to get field " + name + " from " + getModuleInclusiveClassName(owner.getClass()), e);
+            throw new RuntimeException("Failed to get field " + name + " from " + getModuleInclusiveClassName(instance.getClass()), e);
         }
     }
 
     /**
      * Invokes the non-static method with the given name, parameter types and return type on the given object.
      *
-     * @param owner         The object to invoke the method on
+     * @param instance         The object to invoke the method on
      * @param name          The name of the method
      * @param returnType    The return type of the method
      * @param argumentTypes The argument types of the method
@@ -399,24 +399,24 @@ public final class ReflectionUtils {
      * @see #invokeNonStatic(Object, String, MethodType, Object...)
      */
     @SuppressWarnings("unchecked")
-    public static <T> T invokeNonStatic(Object owner, String name, Class<T> returnType, Class<?>[] argumentTypes, Object... arguments) {
-        return (T) ReflectionUtils.invokeNonStatic(owner, name, MethodType.methodType(returnType, argumentTypes), arguments);
+    public static <T> T invokeNonStatic(Object instance, String name, Class<T> returnType, Class<?>[] argumentTypes, Object... arguments) {
+        return (T) ReflectionUtils.invokeNonStatic(instance, name, MethodType.methodType(returnType, argumentTypes), arguments);
     }
 
     /**
      * Invokes the non-static method with the given name, parameter types and return type on the given object.
      *
-     * @param owner     The object to invoke the method on
+     * @param instance     The object to invoke the method on
      * @param name      The name of the method
      * @param type      The type of the method
      * @param arguments The arguments to use for the method invocation
      * @return the value returned by the method, as an {@link Object}
      */
-    public static Object invokeNonStatic(Object owner, String name, MethodType type, Object... arguments) {
+    public static Object invokeNonStatic(Object instance, String name, MethodType type, Object... arguments) {
         try {
-            return LookupHelper.LOOKUP.bind(owner, name, type).invokeWithArguments(arguments);
+            return LookupHelper.LOOKUP.bind(instance, name, type).invokeWithArguments(arguments);
         } catch (Throwable e) {
-            throw new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(owner.getClass()) + "." + name + type, e);
+            throw new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(instance.getClass()) + "." + name + type, e);
         }
     }
 
