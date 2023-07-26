@@ -2066,7 +2066,7 @@ public final class ReflectionUtils {
 
         /**
          * Exploits the Proxy API to gain access to the {@link jdk.internal.access} package,
-         * which is normally prohibited to classes outside the {@code java.base} module.
+         * which is normally not visible to modules that are not part of the JDK implementation.
          */
         @SuppressWarnings("SuspiciousInvocationHandlerImplementation")
         private static void gainInternalAccess() {
