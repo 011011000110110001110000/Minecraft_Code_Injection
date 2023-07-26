@@ -2071,10 +2071,10 @@ public final class ReflectionUtils {
         @SuppressWarnings("SuspiciousInvocationHandlerImplementation")
         private static void gainInternalAccess() {
             final String javaLangAccessName = "jdk.internal.access.JavaLangAccess";
-            final Class<?> javaLangAccessInterface;
-            final Class<?> injectorClass;
             final InjectorClassLoader injectorLoader = new InjectorClassLoader();
+            final Class<?> javaLangAccessInterface;
             final Class<?>[] interfaces;
+            final Class<?> injectorClass;
 
             try {
                 javaLangAccessInterface = Class.forName(javaLangAccessName);
