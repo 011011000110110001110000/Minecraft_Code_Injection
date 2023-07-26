@@ -2079,7 +2079,7 @@ public final class ReflectionUtils {
 
             try {
                 javaLangAccessInterface = Class.forName(javaLangAccessName);
-                interfaces  = new Class[] {
+                interfaces = new Class[]{
                         javaLangAccessInterface
                 };
 
