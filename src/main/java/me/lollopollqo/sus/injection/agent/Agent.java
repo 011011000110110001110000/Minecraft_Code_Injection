@@ -34,7 +34,7 @@ public class Agent {
         try {
             sendMessageInGame();
         } catch (Exception e) {
-            System.err.println("WARNING: could not send welcome message ingame!");
+            System.err.println("WARNING: could not send welcome message in-game!");
             e.printStackTrace(System.err);
         }
 
@@ -56,7 +56,7 @@ public class Agent {
             return;
         }
 
-        // Bind the remote handler's stub in the registry
+        // Bind the remote handle's stub in the registry
         try {
             Agent.registry.rebind(REMOTE_HANDLE_NAME, Agent.handleStub);
             System.out.println("Handle binding complete!");

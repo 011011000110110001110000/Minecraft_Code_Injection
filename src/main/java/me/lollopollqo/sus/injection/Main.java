@@ -22,7 +22,6 @@ import java.util.Scanner;
  * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
  */
 public class Main {
-    public static final int REGISTRY_PORT = Registry.REGISTRY_PORT;
     public static final String STOP_COMMAND = "STOP";
     private static final String MULTIMC_ENTRYPOINT = "org.multimc.EntryPoint";
     private static final String RMI_HELLO_MESSAGE = "This hello message was sent thanks to RMI!";
@@ -52,7 +51,7 @@ public class Main {
 
         // Start RMI registry
         try {
-            Main.registry = LocateRegistry.createRegistry(Main.REGISTRY_PORT);
+            Main.registry = LocateRegistry.createRegistry(Registry.REGISTRY_PORT);
         } catch (RemoteException e) {
             System.err.println("Could not find / create RMI registry!");
             e.printStackTrace(System.err);
