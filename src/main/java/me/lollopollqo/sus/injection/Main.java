@@ -16,6 +16,11 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Scanner;
 
+/**
+ * TODO: Add documentation
+ *
+ * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
+ */
 public class Main {
     public static final int REGISTRY_PORT = Registry.REGISTRY_PORT;
     public static final String STOP_COMMAND = "STOP";

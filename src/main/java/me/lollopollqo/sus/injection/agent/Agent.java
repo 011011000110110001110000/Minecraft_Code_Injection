@@ -13,8 +13,10 @@ import java.rmi.server.UnicastRemoteObject;
 
 /**
  * TODO: Add documentation
+ * The agent class, whose {@link #agentmain(String, Instrumentation)} method
+ * will run once it is attached to the target process.
  *
- * @author Lollopollqo
+ * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
  */
 public class Agent {
     private static final String AGENT_HELLO_MESSAGE = "Hello from a Java agent!";

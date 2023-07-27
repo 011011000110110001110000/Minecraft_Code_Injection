@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Utility class that contains utility methods to gather information about running Java Virtual Machines.
  *
- * @author Lollopollqo
+ * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
  */
 public final class ProcessUtils {
     /**
