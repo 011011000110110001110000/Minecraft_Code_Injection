@@ -33,7 +33,7 @@ public class Agent {
         System.out.println(AGENT_HELLO_MESSAGE);
 
         try {
-            sendMessageInGame();
+            sayHello();
         } catch (Exception e) {
             System.err.println("WARNING: could not send welcome message in-game!");
             e.printStackTrace(System.err);
@@ -68,7 +68,7 @@ public class Agent {
 
     }
 
-    private static void sendMessageInGame() throws Exception {
+    private static void sayHello() throws Exception {
         sendSystemMessage(AGENT_HELLO_MESSAGE);
     }
 
