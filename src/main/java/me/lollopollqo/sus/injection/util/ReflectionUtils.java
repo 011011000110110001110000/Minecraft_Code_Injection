@@ -421,8 +421,8 @@ public final class ReflectionUtils {
     public static Object invokeNonStatic(Object instance, String name, MethodType type, Object... arguments) {
         try {
             return LookupHelper.LOOKUP.bind(instance, name, type).invokeWithArguments(arguments);
-        } catch (Throwable e) {
-            throw new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(instance.getClass()) + "." + name + type, e);
+        } catch (Throwable t) {
+            throw new RuntimeException("Failed to invoke " + getModuleInclusiveClassName(instance.getClass()) + "." + name + type, t);
         }
     }
 
@@ -611,7 +611,7 @@ public final class ReflectionUtils {
      * @return a method handle which can load values from the field for {@code instance}
      * @throws ReflectiveOperationException if the field does not exist, if access checking fails, or if the field is {@code static}
      */
-    public static <T, O extends T> MethodHandle findGetterAndBind(Class<T> owner, O instance, String name, Class<?> type) throws ReflectiveOperationException {
+    public static <O, I extends O> MethodHandle findGetterAndBind(Class<O> owner, I instance, String name, Class<?> type) throws ReflectiveOperationException {
         return ReflectionUtils.findGetter(owner, name, type).bindTo(instance);
     }
 
@@ -653,7 +653,7 @@ public final class ReflectionUtils {
      * @return a method handle which can store values into the field for {@code instance}
      * @throws ReflectiveOperationException if the field does not exist, if access checking fails, or if the field is {@code static} or {@code final}
      */
-    public static <T, O extends T> MethodHandle findSetterAndBind(Class<T> owner, O instance, String name, Class<?> type) throws ReflectiveOperationException {
+    public static <O, T extends O> MethodHandle findSetterAndBind(Class<O> owner, T instance, String name, Class<?> type) throws ReflectiveOperationException {
         return ReflectionUtils.findSetter(owner, name, type).bindTo(instance);
     }
 
@@ -1091,6 +1091,25 @@ public final class ReflectionUtils {
         }
 
         /**
+         * Convenience method for invoking a {@link MethodHandle} that wraps any checked exceptions
+         * thrown from the invocation into a {@link RuntimeException}.
+         *
+         * @param handle The method handle to invoke
+         * @param args   The arguments passed to the handle's {@code invoke} method
+         * @return The value returned from the invocation of the given {@code handle}
+         */
+        private static Object invokeHandle(MethodHandle handle, Object... args) {
+            try {
+                return handle.invokeWithArguments(args);
+            } catch (RuntimeException | Error e) {
+                // Don't wrap unchecked exceptions and errors
+                throw e;
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        /**
          * Private constructor to prevent instantiation.
          */
         private MethodHandleHelper() {
@@ -1192,11 +1211,16 @@ public final class ReflectionUtils {
         /**
          * Integer flag indicating that the lookup object has trusted access
          */
-        private static final int TRUSTED_MODE;
+        private static final int TRUSTED_LOOKUP_MODES;
+        /**
+         * Integer flag indicating that the lookup object has full privilege access
+         */
+        private static final int FULL_PRIVILEGE_ACCESS_MODES;
 
         static {
 
-            TRUSTED_MODE = -1;
+            TRUSTED_LOOKUP_MODES = -1;
+            FULL_PRIVILEGE_ACCESS_MODES = MethodHandles.lookup().lookupModes();
 
             // Enable AccessibleObject#setAccessible(boolean) usage on the MethodHandles.Lookup members
             ModuleHelper.addOpens(Object.class.getModule(), "java.lang.invoke", LookupHelper.class.getModule());
@@ -1228,14 +1252,40 @@ public final class ReflectionUtils {
         }
 
         /**
+         * Produces a {@link MethodHandles.Lookup} instance with the given {@code lookupClass},
+         * as if obtained via a call to {@link MethodHandles#lookup()} by {@code lookupClass} itself.
+         * As such, the lookup object will have full privilege access.
+         *
+         * @param lookupClass The desired lookup class
+         * @return the created {@code Lookup} object
+         */
+        private static MethodHandles.Lookup lookupIn(Class<?> lookupClass) {
+            return LookupHelper.newLookup(lookupClass, null, FULL_PRIVILEGE_ACCESS_MODES);
+        }
+
+        /**
          * Produces a trusted {@link MethodHandles.Lookup} instance with the given {@code lookupClass} and a {@code null} {@code previousLookupClass}.
          *
          * @param lookupClass The desired lookup class
          * @return the created {@code Lookup} object
          */
         private static MethodHandles.Lookup trustedLookupIn(Class<?> lookupClass) {
+            return LookupHelper.newLookup(lookupClass, null, TRUSTED_LOOKUP_MODES);
+        }
+
+        /**
+         * Produces a {@link MethodHandles.Lookup} instance with the given {@code lookupClass},
+         * {@code previousLookupClass}, and {@code lookupModes}.
+         *
+         * @param lookupClass         The desired lookup class
+         * @param previousLookupClass The desired previous lookup class
+         * @param lookupModes         The desired lookup modes
+         * @return the created {@code Lookup} object
+         */
+        @SuppressWarnings("SameParameterValue")
+        private static MethodHandles.Lookup newLookup(Class<?> lookupClass, Class<?> previousLookupClass, int lookupModes) {
             try {
-                return LOOKUP_CONSTRUCTOR.newInstance(lookupClass, null, TRUSTED_MODE);
+                return LOOKUP_CONSTRUCTOR.newInstance(lookupClass, previousLookupClass, lookupModes);
             } catch (ReflectiveOperationException e) {
                 throw new RuntimeException("Could not create an instance of " + ReflectionUtils.getModuleInclusiveClassName(MethodHandles.Lookup.class), e);
             }
@@ -1957,11 +2007,7 @@ public final class ReflectionUtils {
          * @param m2  The module the package should be exported to
          */
         private static void addExports(Module m1, String pkg, Module m2) {
-            try {
-                addExportsToModule.invoke(m1, pkg, m2);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
+            MethodHandleHelper.invokeHandle(addExportsToModule, m1, pkg, m2);
         }
 
         /**
@@ -1973,11 +2019,7 @@ public final class ReflectionUtils {
          * @param pkg The name of the package to export
          */
         private static void addExportsToAllUnnamed(Module m, String pkg) {
-            try {
-                addExportsToAllUnnamedModules.invoke(m, pkg);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
+            MethodHandleHelper.invokeHandle(addExportsToAllUnnamedModules, m, pkg);
         }
 
         /**
@@ -1989,11 +2031,7 @@ public final class ReflectionUtils {
          * @param pkg The name of the package to export
          */
         private static void addExports(Module m, String pkg) {
-            try {
-                addExportsToAllModules.invoke(m, pkg);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
+            MethodHandleHelper.invokeHandle(addExportsToAllModules, m, pkg);
         }
 
         /**
@@ -2006,11 +2044,7 @@ public final class ReflectionUtils {
          * @param m2  The module to open the package to
          */
         private static void addOpens(Module m1, String pkg, Module m2) {
-            try {
-                addOpensToModule.invoke(m1, pkg, m2);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
+            MethodHandleHelper.invokeHandle(addOpensToModule, m1, pkg, m2);
         }
 
         /**
@@ -2022,11 +2056,7 @@ public final class ReflectionUtils {
          * @param pkg The name of the package to open
          */
         private static void addOpensToAllUnnamed(Module m, String pkg) {
-            try {
-                addExportsToAllUnnamedModules.invoke(m, pkg);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
+            MethodHandleHelper.invokeHandle(addOpensToAllUnnamedModules, m, pkg);
         }
 
         /**
@@ -2037,11 +2067,7 @@ public final class ReflectionUtils {
          * @param m The module to update
          */
         private static void addEnableNativeAccess(Module m) {
-            try {
-                addEnableNativeAccessToModule.invoke(m);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
+            MethodHandleHelper.invokeHandle(addEnableNativeAccessToModule, m);
         }
 
         /**
@@ -2050,11 +2076,7 @@ public final class ReflectionUtils {
          * Updates all unnamed modules to allow access to restricted methods.
          */
         private static void addEnableNativeAccessAllUnnamed() {
-            try {
-                addEnableNativeAccessToAllUnnamedModules.invoke();
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
+            MethodHandleHelper.invokeHandle(addExportsToAllUnnamedModules);
         }
 
         /**
@@ -2066,11 +2088,7 @@ public final class ReflectionUtils {
          * @return {@code true} if {@code m} can access restricted methods, {@code false} otherwise
          */
         private static boolean isEnableNativeAccess(Module m) {
-            try {
-                return (boolean) isEnableNativeAccess.invoke(m);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
+            return (boolean) MethodHandleHelper.invokeHandle(isEnableNativeAccess, m);
         }
 
         /**
