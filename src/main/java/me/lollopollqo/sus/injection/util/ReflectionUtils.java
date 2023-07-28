@@ -1211,7 +1211,7 @@ public final class ReflectionUtils {
         /**
          * Integer flag indicating that the lookup object has trusted access
          */
-        private static final int TRUSTED_LOOKUP_MODES;
+        private static final int TRUSTED_ACCESS_MODES;
         /**
          * Integer flag indicating that the lookup object has full privilege access
          */
@@ -1219,7 +1219,7 @@ public final class ReflectionUtils {
 
         static {
 
-            TRUSTED_LOOKUP_MODES = -1;
+            TRUSTED_ACCESS_MODES = -1;
             FULL_PRIVILEGE_ACCESS_MODES = MethodHandles.lookup().lookupModes();
 
             // Enable AccessibleObject#setAccessible(boolean) usage on the MethodHandles.Lookup members
@@ -1270,7 +1270,7 @@ public final class ReflectionUtils {
          * @return the created {@code Lookup} object
          */
         private static MethodHandles.Lookup trustedLookupIn(Class<?> lookupClass) {
-            return LookupHelper.newLookup(lookupClass, null, TRUSTED_LOOKUP_MODES);
+            return LookupHelper.newLookup(lookupClass, null, TRUSTED_ACCESS_MODES);
         }
 
         /**
