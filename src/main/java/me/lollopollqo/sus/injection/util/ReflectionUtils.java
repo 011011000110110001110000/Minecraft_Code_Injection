@@ -1098,6 +1098,7 @@ public final class ReflectionUtils {
          * @param args   The arguments passed to the handle's {@code invoke} method
          * @return The value returned from the invocation of the given {@code handle}
          */
+        @SuppressWarnings("UnusedReturnValue")
         private static Object invokeHandle(MethodHandle handle, Object... args) {
             try {
                 return handle.invokeWithArguments(args);
@@ -1931,18 +1932,7 @@ public final class ReflectionUtils {
          * @see JavaLangAccessBridge#addEnableNativeAccess(Module)
          */
         private static final MethodHandle addEnableNativeAccessToModule;
-        /**
-         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccessAllUnnamed()}
-         *
-         * @see JavaLangAccessBridge#addEnableNativeAccessAllUnnamed()
-         */
-        private static final MethodHandle addEnableNativeAccessToAllUnnamedModules;
-        /**
-         * Cached {@link MethodHandle} for {@link jdk.internal.access.JavaLangAccess#isEnableNativeAccess(Module)}
-         *
-         * @see JavaLangAccessBridge#isEnableNativeAccess(Module)
-         */
-        private static final MethodHandle isEnableNativeAccess;
+
 
         static {
 
@@ -1989,8 +1979,6 @@ public final class ReflectionUtils {
                 addOpensToModule = lookup.findVirtual(javaLangAccessClass, "addOpens", MethodType.methodType(void.class, Module.class, String.class, Module.class)).bindTo(javaLangAccessInstance);
                 addOpensToAllUnnamedModules = lookup.findVirtual(javaLangAccessClass, "addOpensToAllUnnamed", MethodType.methodType(void.class, Module.class, String.class)).bindTo(javaLangAccessInstance);
                 addEnableNativeAccessToModule = lookup.findVirtual(javaLangAccessClass, "addEnableNativeAccess", MethodType.methodType(Module.class, Module.class)).bindTo(javaLangAccessInstance);
-                addEnableNativeAccessToAllUnnamedModules = lookup.findVirtual(javaLangAccessClass, "addEnableNativeAccessAllUnnamed", MethodType.methodType(void.class)).bindTo(javaLangAccessInstance);
-                isEnableNativeAccess = lookup.findVirtual(javaLangAccessClass, "isEnableNativeAccess", MethodType.methodType(boolean.class, Module.class)).bindTo(javaLangAccessInstance);
             } catch (Throwable t) {
                 throw new RuntimeException("Could not obtain handles for the methods in " + javaLangAccessClassName, t);
             }
@@ -2068,27 +2056,6 @@ public final class ReflectionUtils {
          */
         private static void addEnableNativeAccess(Module m) {
             MethodHandleHelper.invokeHandle(addEnableNativeAccessToModule, m);
-        }
-
-        /**
-         * Bridge method for {@link jdk.internal.access.JavaLangAccess#addEnableNativeAccessAllUnnamed()}
-         * <p>
-         * Updates all unnamed modules to allow access to restricted methods.
-         */
-        private static void addEnableNativeAccessAllUnnamed() {
-            MethodHandleHelper.invokeHandle(addExportsToAllUnnamedModules);
-        }
-
-        /**
-         * Bridge method for {@link jdk.internal.access.JavaLangAccess#isEnableNativeAccess(Module)}
-         * <p>
-         * Checks whether module {@code m} can access restricted methods.
-         *
-         * @param m The module to check against
-         * @return {@code true} if {@code m} can access restricted methods, {@code false} otherwise
-         */
-        private static boolean isEnableNativeAccess(Module m) {
-            return (boolean) MethodHandleHelper.invokeHandle(isEnableNativeAccess, m);
         }
 
         /**
