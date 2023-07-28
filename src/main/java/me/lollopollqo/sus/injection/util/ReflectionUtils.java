@@ -163,7 +163,7 @@ public final class ReflectionUtils {
     }
 
     /**
-     * Gets a method by name and makes it accessible. <br>
+     * Gets a method by name and parameter types and makes it accessible. <br>
      * Unlike {@link #getAccessibleDeclaredMethod(Class, String, Class[])}, this method will bypass reflection filters.
      *
      * @param owner      The class or interface from which the method is accessed
