@@ -155,6 +155,7 @@ public final class ReflectionUtils {
      * @throws NoSuchFieldException if a field with the specified name could not be found in the specified class
      * @see #getAccessibleDeclaredMethod(Class, String, Class[])
      * @see #setAccessible(AccessibleObject, boolean)
+     * @see #ensureUnfilteredReflection(Class)
      */
     public static Field getAccessibleDeclaredFieldNoFilter(Class<?> owner, String name) throws NoSuchFieldException {
         ReflectionUtils.ensureUnfilteredReflection(owner);
@@ -172,6 +173,7 @@ public final class ReflectionUtils {
      * @throws NoSuchMethodException if a method with the specified name and parameter types could not be found in the specified class
      * @see #getAccessibleDeclaredMethod(Class, String, Class[])
      * @see #setAccessible(AccessibleObject, boolean)
+     * @see #ensureUnfilteredReflection(Class)
      */
     public static Method getAccessibleDeclaredMethodNoFilter(Class<?> owner, String name, Class<?>... paramTypes) throws NoSuchMethodException {
         ReflectionUtils.ensureUnfilteredReflection(owner);
@@ -187,6 +189,7 @@ public final class ReflectionUtils {
      *
      * @param owner The class in which the fields are declared
      * @return The unfiltered list of declared fields
+     * @see #ensureUnfilteredReflection(Class)
      * @see #getAllDeclaredMethodsOfClass(Class)
      * @see jdk.internal.reflect.Reflection#registerFieldsToFilter(Class, Set)
      * @see jdk.internal.reflect.Reflection#filterFields(Class, Field[])
@@ -206,6 +209,7 @@ public final class ReflectionUtils {
      * @param owner The class in which the methods are declared
      * @return The unfiltered list of declared methods
      * @see #getAllDeclaredFieldsOfClass(Class)
+     * @see #ensureUnfilteredReflection(Class)
      * @see jdk.internal.reflect.Reflection#registerMethodsToFilter(Class, Set)
      * @see jdk.internal.reflect.Reflection#filterMethods(Class, Method[])
      */
@@ -218,6 +222,8 @@ public final class ReflectionUtils {
      * Ensures any reflective operations on the given class will not be affected by reflection filters.
      *
      * @param clazz The class on which reflective operations will be performed
+     * @see #clearReflectionCacheForClass(Class)
+     * @see #clearReflectionFiltersForClass(Class)
      */
     public static void ensureUnfilteredReflection(Class<?> clazz) {
         ReflectionUtils.clearReflectionFiltersForClass(clazz);
@@ -374,8 +380,8 @@ public final class ReflectionUtils {
      * Gets the value of the non-static field with the specified {@code name} and {@code type} for the given object.
      *
      * @param instance The object that owns the field value
-     * @param name  The name of the field
-     * @param type  The type of the field
+     * @param name     The name of the field
+     * @param type     The type of the field
      * @return the value of the field for {@code owner}
      */
     @SuppressWarnings("unchecked")
@@ -390,7 +396,7 @@ public final class ReflectionUtils {
     /**
      * Invokes the non-static method with the given name, parameter types and return type on the given object.
      *
-     * @param instance         The object to invoke the method on
+     * @param instance      The object to invoke the method on
      * @param name          The name of the method
      * @param returnType    The return type of the method
      * @param argumentTypes The argument types of the method
@@ -406,7 +412,7 @@ public final class ReflectionUtils {
     /**
      * Invokes the non-static method with the given name, parameter types and return type on the given object.
      *
-     * @param instance     The object to invoke the method on
+     * @param instance  The object to invoke the method on
      * @param name      The name of the method
      * @param type      The type of the method
      * @param arguments The arguments to use for the method invocation
