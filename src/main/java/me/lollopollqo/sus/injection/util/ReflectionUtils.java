@@ -1192,9 +1192,11 @@ public final class ReflectionUtils {
         /**
          * Integer flag indicating that the lookup object has trusted access
          */
-        private static final int TRUSTED_MODE = -1;
+        private static final int TRUSTED_MODE;
 
         static {
+
+            TRUSTED_MODE = -1;
 
             // Enable AccessibleObject#setAccessible(boolean) usage on the MethodHandles.Lookup members
             ModuleHelper.addOpens(Object.class.getModule(), "java.lang.invoke", LookupHelper.class.getModule());
