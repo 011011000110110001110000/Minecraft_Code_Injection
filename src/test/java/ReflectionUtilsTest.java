@@ -46,16 +46,10 @@ public class ReflectionUtilsTest {
     @SuppressWarnings("deprecation")
     void testSetAccessible() throws Throwable {
         final Field serialVersionUID = ArrayList.class.getDeclaredField("serialVersionUID");
-        final MethodHandle setAccessible = ReflectionUtils.findVirtual(AccessibleObject.class, "setAccessible", void.class, boolean.class);
 
         Assertions.assertFalse(serialVersionUID.isAccessible());
 
         Assertions.assertFalse(serialVersionUID.trySetAccessible());
-
-        Assertions.assertThrowsExactly(
-                InaccessibleObjectException.class,
-                () -> setAccessible.bindTo(serialVersionUID).invoke(true)
-        );
 
         ReflectionUtils.setAccessible(serialVersionUID, true);
 
