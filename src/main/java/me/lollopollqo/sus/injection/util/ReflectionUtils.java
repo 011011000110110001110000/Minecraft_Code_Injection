@@ -1190,7 +1190,7 @@ public final class ReflectionUtils {
          */
         private static final Constructor<MethodHandles.Lookup> LOOKUP_CONSTRUCTOR;
         /**
-         * Used to denote that the lookup object has trusted access
+         * Integer flag indicating that the lookup object has trusted access
          */
         private static final int TRUSTED_MODE = -1;
 
