@@ -285,6 +285,18 @@ public final class ReflectionUtils {
     }
 
     /**
+     * Produces a {@link MethodHandles.Lookup} instance with the given {@code lookupClass},
+     * as if obtained via a call to {@link MethodHandles#lookup()} by {@code lookupClass} itself.
+     * As such, the lookup object will have full privilege access.
+     *
+     * @param lookupClass The desired lookup class
+     * @return the created {@code Lookup} object
+     */
+    public static MethodHandles.Lookup lookupIn(Class<?> lookupClass) {
+        return LookupHelper.lookupIn(lookupClass);
+    }
+
+    /**
      * Exports the package with the given name from the {@code source} module to the {@code target} module.
      *
      * @param source      The module the package belongs to
@@ -1253,6 +1265,8 @@ public final class ReflectionUtils {
         }
 
         /**
+         * Internal helper for {@link ReflectionUtils#lookupIn(Class)}
+         * <p>
          * Produces a {@link MethodHandles.Lookup} instance with the given {@code lookupClass},
          * as if obtained via a call to {@link MethodHandles#lookup()} by {@code lookupClass} itself.
          * As such, the lookup object will have full privilege access.

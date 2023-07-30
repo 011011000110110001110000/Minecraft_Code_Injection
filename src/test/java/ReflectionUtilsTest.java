@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 
@@ -94,6 +95,20 @@ public class ReflectionUtilsTest {
         privateFieldField.setAccessible(true);
 
         Assertions.assertEquals(privateFieldGetter.invoke(testObject), privateFieldField.get(testObject));
+    }
+
+    @Test
+    void testGetUnsafe() throws Throwable {
+        final sun.misc.Unsafe unsafe = (sun.misc.Unsafe) ReflectionUtils.lookupIn(sun.misc.Unsafe.class)
+                .findStatic(
+                        sun.misc.Unsafe.class,
+                        "getUnsafe",
+                        MethodType.methodType(sun.misc.Unsafe.class)
+                )
+                .invoke();
+
+        Assertions.assertNotNull(unsafe);
+        Assertions.assertEquals(sun.misc.Unsafe.class, unsafe.getClass());
     }
 
     private static final class DummyClass {
