@@ -119,7 +119,7 @@ public final class ReflectionUtils {
      * @see #setAccessible(AccessibleObject, boolean)
      */
     public static Field getAccessibleDeclaredField(Class<?> owner, String name) throws NoSuchFieldException {
-        Field field = owner.getDeclaredField(name);
+        final Field field = owner.getDeclaredField(name);
         ReflectionUtils.setAccessible(field, true);
         return field;
     }
@@ -140,7 +140,7 @@ public final class ReflectionUtils {
      * @see #setAccessible(AccessibleObject, boolean)
      */
     public static Method getAccessibleDeclaredMethod(Class<?> owner, String name, Class<?>... paramTypes) throws NoSuchMethodException {
-        Method method = owner.getDeclaredMethod(name, paramTypes);
+        final Method method = owner.getDeclaredMethod(name, paramTypes);
         ReflectionUtils.setAccessible(method, true);
         return method;
     }
