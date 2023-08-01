@@ -1118,7 +1118,7 @@ public final class ReflectionUtils {
                 // Don't wrap unchecked exceptions and errors
                 throw e;
             } catch (Throwable t) {
-                throw new RuntimeException(t);
+                throw new RuntimeException("Exception while invoking " + handle + "with arguments :" + Arrays.toString(args), t);
             }
         }
 
