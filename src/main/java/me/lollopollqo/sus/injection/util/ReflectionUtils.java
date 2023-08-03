@@ -1,7 +1,6 @@
 package me.lollopollqo.sus.injection.util;
 
 import org.jetbrains.annotations.NotNull;
-
 import org.objectweb.asm.Type;
 import org.objectweb.asm.*;
 
@@ -11,12 +10,16 @@ import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.*;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * A collection of hacks and utilities for easier / enhanced usage of the {@link java.lang.reflect reflection} and {@link java.lang.invoke invocation} APIs.
  *
  * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
+ * @apiNote All {@link MethodHandle}s produced by members of this class are not bound to any specific caller.
  */
 @SuppressWarnings({"unused", "Java9ReflectionClassVisibility"})
 public final class ReflectionUtils {
