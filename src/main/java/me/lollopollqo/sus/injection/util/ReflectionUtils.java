@@ -14,7 +14,7 @@ import java.lang.reflect.*;
 import java.util.*;
 
 /**
- * A collection of hacks and utilities for easier / enhanced usage of the reflection and invocation APIs.
+ * A collection of hacks and utilities for easier / enhanced usage of the {@link java.lang.reflect reflection} and {@link java.lang.invoke invocation} APIs.
  *
  * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
  */
