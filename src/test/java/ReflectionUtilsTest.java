@@ -1,6 +1,5 @@
 import me.lollopollqo.sus.injection.util.ReflectionUtils;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -9,10 +8,14 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 
 @SuppressWarnings({"unused", "FieldCanBeLocal", "FieldMayBeFinal"})
+@TestMethodOrder(
+        MethodOrderer.OrderAnnotation.class
+)
 public class ReflectionUtilsTest {
     static boolean dummyClassInitialized;
 
     @Test
+    @Order(1)
     void testInit() throws Throwable {
         final Class<?> classReflectionUtils = Class.forName("me.lollopollqo.sus.injection.util.ReflectionUtils");
     }
