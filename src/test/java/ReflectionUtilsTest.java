@@ -8,9 +8,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 
 @SuppressWarnings({"unused", "FieldCanBeLocal", "FieldMayBeFinal"})
-@TestMethodOrder(
-        MethodOrderer.OrderAnnotation.class
-)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class ReflectionUtilsTest {
     static boolean dummyClassInitialized;
 
