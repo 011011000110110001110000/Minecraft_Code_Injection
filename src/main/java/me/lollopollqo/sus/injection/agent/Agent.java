@@ -1,9 +1,9 @@
 package me.lollopollqo.sus.injection.agent;
 
 import me.lollopollqo.sus.injection.rmi.RemoteHandle;
-import me.lollopollqo.sus.injection.util.ReflectionUtils;
 
 import java.lang.instrument.Instrumentation;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.rmi.NoSuchObjectException;
 import java.rmi.RemoteException;
@@ -73,18 +73,25 @@ public class Agent {
     }
 
     public static void sendSystemMessage(String message) throws Exception {
-        final Class<?> MinecraftClass = ReflectionUtils.loadClass("emh");
-        final Class<?> ComponentClass = ReflectionUtils.loadClass("tj");
+        final Class<?> MinecraftClass = Class.forName("emh");
+        final Class<?> ComponentClass = Class.forName("tj");
 
-        final Method literal = ReflectionUtils.getAccessibleDeclaredMethod(ComponentClass, "b", String.class);
+        final Method literal = ComponentClass.getDeclaredMethod("b", String.class);
+        literal.setAccessible(true);
         final Object textComponent = literal.invoke(ComponentClass, message);
 
-        final Object instance = ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "F").get(MinecraftClass);
+        final Field instanceField = MinecraftClass.getDeclaredField("F");
+        instanceField.setAccessible(true);
 
-        final Object player = ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "t").get(instance);
+        final Object instance = instanceField.get(MinecraftClass);
+
+        final Field playerField = MinecraftClass.getDeclaredField("t");
+        playerField.setAccessible(true);
+
+        final Object player = playerField.get(instance);
 
         if (player != null) {
-            final Method sendSystemMessage = ReflectionUtils.getAccessibleDeclaredMethod(player.getClass(), "a", ComponentClass);
+            final Method sendSystemMessage = player.getClass().getDeclaredMethod("a", ComponentClass);
             sendSystemMessage.invoke(player, textComponent);
         } else {
             System.err.println("Could not find player! Make sure you have joined a world.");
