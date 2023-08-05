@@ -57,7 +57,7 @@ public final class ProcessUtils {
     @Nullable
     public static String mainClass(VirtualMachineDescriptor vm, boolean fullyQualified) {
         // This should return the result of sun.jvmstat.monitor.MonitoredVmUtil#commandLine(MonitoredVm)String if available
-        // We could also abuse Unsafe and break the module system to get access to the internal JDK modules and call the method ourselves, but it is unnecessary
+        // We could also break the module system to get access to the internal JDK modules and call the method ourselves, but it is unnecessary
         String displayName = vm.displayName();
 
         // If the process ID and the display name are equal, it means something went wrong when trying to get the actual command line string, so return null
