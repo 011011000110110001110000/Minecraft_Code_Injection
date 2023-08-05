@@ -26,6 +26,27 @@ jar {
     }
 }
 
+tasks.register('fatJar', Jar) {
+    manifest {
+        attributes(
+                'Manifest-Version': '1.0',
+                'Created-By': "Gradle ${gradle.gradleVersion}",
+                'Agent-Class': 'me.lollopollqo.sus.injection.agent.Agent',
+                'Can-Redefine-Classes': 'true',
+                'Can-Retransform-Classes': 'true',
+                'Main-Class': 'me.lollopollqo.sus.injection.Main',
+                'Permissions': 'all-permissions'
+        )
+    }
+    archiveBaseName = rootProject.name
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.runtimeClasspath.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    } with jar
+}
+
 dependencies {
     implementation 'org.jetbrains:annotations:24.0.0'
     implementation 'org.ow2.asm:asm:9.5'
