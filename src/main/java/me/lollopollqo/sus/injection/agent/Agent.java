@@ -102,6 +102,11 @@ public class Agent {
         }
     }
 
+    /**
+     * Helper class that holds {@link MethodHandle}s and {@link VarHandle}s for methods / fields in the Minecraft jar.
+     *
+     * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
+     */
     private static class Minecraft {
         private static final MethodHandle sendSystemMessageHandle;
         private static final MethodHandle literalHandle;
