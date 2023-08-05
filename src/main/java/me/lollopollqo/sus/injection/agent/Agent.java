@@ -30,7 +30,7 @@ public class Agent {
 
     @SuppressWarnings("unused")
     public static void agentmain(String args, Instrumentation in) {
-        Thread.currentThread().setName("Lollopollqo's Java Agent");
+        Thread.currentThread().setName("Java Agent Thread");
         System.out.println(AGENT_HELLO_MESSAGE);
 
         try {
