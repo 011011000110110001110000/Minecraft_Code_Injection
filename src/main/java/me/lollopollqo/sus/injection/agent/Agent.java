@@ -138,6 +138,11 @@ public class Agent {
 
     }
 
+    /**
+     * Basic {@link RemoteHandle} implementation that just executes the given {@link me.lollopollqo.sus.injection.rmi.RemoteHandle.RemoteTask}.
+     *
+     * @author <a href=https://github.com/011011000110110001110000>011011000110110001110000</a>
+     */
     private static class Handle implements RemoteHandle {
         @Override
         public void submitTask(RemoteTask task) throws RemoteException {
