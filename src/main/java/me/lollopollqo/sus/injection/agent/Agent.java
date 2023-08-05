@@ -7,7 +7,6 @@ import java.lang.instrument.Instrumentation;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.rmi.NoSuchObjectException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -87,8 +86,9 @@ public class Agent {
 
     public static void shutdown() {
         try {
+            sendSystemMessage("Bye!");
             UnicastRemoteObject.unexportObject(Agent.handle, true);
-        } catch (NoSuchObjectException e) {
+        } catch (Throwable e) {
             throw new RuntimeException(e);
         }
     }

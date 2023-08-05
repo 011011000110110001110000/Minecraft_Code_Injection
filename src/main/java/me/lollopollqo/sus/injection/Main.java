@@ -106,7 +106,7 @@ public class Main {
 
                     if (message.equals(STOP_COMMAND)) {
                         try {
-                            sendRemoteMessage("Bye!");
+                            sendRemoteMessage("Detaching agent...");
                             Main.agentHandleStub.submitTask(Agent::shutdown);
                             vm.detach();
                         } catch (RemoteException re) {
