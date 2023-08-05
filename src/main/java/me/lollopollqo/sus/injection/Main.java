@@ -85,8 +85,8 @@ public class Main {
                         System.out.println(RMI_HELLO_MESSAGE);
                         try {
                             Agent.sendSystemMessage(RMI_HELLO_MESSAGE);
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
+                        } catch (Throwable t) {
+                            throw new RuntimeException(t);
                         }
                     }
             );
@@ -106,6 +106,7 @@ public class Main {
 
                     if (message.equals(STOP_COMMAND)) {
                         try {
+                            sendRemoteMessage("Bye!");
                             Main.agentHandleStub.submitTask(Agent::shutdown);
                             vm.detach();
                         } catch (RemoteException re) {
@@ -118,19 +119,24 @@ public class Main {
                         return;
                     }
 
-                    Main.agentHandleStub.submitTask(
-                            () -> {
-                                try {
-                                    Agent.sendSystemMessage(message);
-                                } catch (Exception e) {
-                                    throw new RuntimeException(e);
-                                }
-                            }
-                    );
+                    sendRemoteMessage(message);
                 }
             }
         } catch (ConnectException ce) {
             System.err.println("The remote agent handle is unreachable!");
         }
     }
+
+    private static void sendRemoteMessage(String message) throws RemoteException {
+        Main.agentHandleStub.submitTask(
+                () -> {
+                    try {
+                        Agent.sendSystemMessage(message);
+                    } catch (Throwable t) {
+                        throw new RuntimeException(t);
+                    }
+                }
+        );
+    }
+
 }

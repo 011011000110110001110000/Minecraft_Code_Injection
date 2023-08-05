@@ -1,10 +1,12 @@
 package me.lollopollqo.sus.injection.agent;
 
 import me.lollopollqo.sus.injection.rmi.RemoteHandle;
+import me.lollopollqo.sus.injection.util.ReflectionUtils;
 
 import java.lang.instrument.Instrumentation;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.rmi.NoSuchObjectException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -34,9 +36,9 @@ public class Agent {
 
         try {
             sayHello();
-        } catch (Exception e) {
+        } catch (Throwable t) {
             System.err.println("WARNING: could not send welcome message in-game!");
-            e.printStackTrace(System.err);
+            t.printStackTrace(System.err);
         }
 
         // Export the remote handle
@@ -68,31 +70,16 @@ public class Agent {
 
     }
 
-    private static void sayHello() throws Exception {
+    private static void sayHello() throws Throwable {
         sendSystemMessage(AGENT_HELLO_MESSAGE);
     }
 
-    public static void sendSystemMessage(String message) throws Exception {
-        final Class<?> MinecraftClass = Class.forName("emh");
-        final Class<?> ComponentClass = Class.forName("tj");
-
-        final Method literal = ComponentClass.getDeclaredMethod("b", String.class);
-        literal.setAccessible(true);
-        final Object textComponent = literal.invoke(ComponentClass, message);
-
-        final Field instanceField = MinecraftClass.getDeclaredField("F");
-        instanceField.setAccessible(true);
-
-        final Object instance = instanceField.get(MinecraftClass);
-
-        final Field playerField = MinecraftClass.getDeclaredField("t");
-        playerField.setAccessible(true);
-
-        final Object player = playerField.get(instance);
+    public static void sendSystemMessage(String message) throws Throwable {
+        final Object textComponent = Minecraft.literalHandle.invoke(message);
+        final Object player = Minecraft.playerHandle.get(Minecraft.instanceHandle.get());
 
         if (player != null) {
-            final Method sendSystemMessage = player.getClass().getDeclaredMethod("a", ComponentClass);
-            sendSystemMessage.invoke(player, textComponent);
+            Minecraft.sendSystemMessageHandle.invoke(player, textComponent);
         } else {
             System.err.println("Could not find player! Make sure you have joined a world.");
         }
@@ -113,6 +100,37 @@ public class Agent {
             System.err.println("An exception occurred while executing remote task: ");
             e.printStackTrace(System.err);
         }
+    }
+
+    private static class Minecraft {
+        private static final MethodHandle sendSystemMessageHandle;
+        private static final MethodHandle literalHandle;
+        private static final VarHandle instanceHandle;
+        private static final VarHandle playerHandle;
+
+        static {
+            try {
+                MethodHandles.Lookup lookup;
+
+                final Class<?> MinecraftClass = ReflectionUtils.loadClass("emh");
+                final Class<?> ComponentClass = ReflectionUtils.loadClass("tj");
+
+                lookup = ReflectionUtils.lookupIn(ComponentClass);
+                literalHandle = lookup.unreflect(ReflectionUtils.getAccessibleDeclaredMethod(ComponentClass, "b", String.class));
+
+                lookup = ReflectionUtils.lookupIn(MinecraftClass);
+                instanceHandle = lookup.unreflectVarHandle(ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "F"));
+                playerHandle = lookup.unreflectVarHandle(ReflectionUtils.getAccessibleDeclaredField(MinecraftClass, "t"));
+
+                final Class<?> playerClass = playerHandle.varType();
+
+                sendSystemMessageHandle = lookup.unreflect(ReflectionUtils.getAccessibleDeclaredMethod(playerClass, "a", ComponentClass));
+
+            } catch (Throwable t) {
+                throw new RuntimeException("", t);
+            }
+        }
+
     }
 
     private static class Handle implements RemoteHandle {
