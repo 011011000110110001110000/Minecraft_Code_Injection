@@ -5,6 +5,21 @@ plugins {
 group = 'me.lollopollqo'
 version = '1.0-SNAPSHOT'
 
+def manifestVer = '1.0'
+def agentClass = 'me.lollopollqo.sus.injection.agent.Agent'
+def mainClass = 'me.lollopollqo.sus.injection.Main'
+
+def manifestAttributes = [
+        'Manifest-Version'       : manifestVer,
+        'Created-By'             : "Gradle ${gradle.gradleVersion}",
+        'Agent-Class'            : agentClass,
+        'Can-Redefine-Classes'   : 'true',
+        'Can-Retransform-Classes': 'true',
+        'Main-Class'             : mainClass,
+        'Permissions'            : 'all-permissions'
+]
+
+
 repositories {
     mavenCentral()
     maven {
@@ -14,32 +29,18 @@ repositories {
 
 jar {
     manifest {
-        attributes(
-                'Manifest-Version': '1.0',
-                'Created-By': "Gradle ${gradle.gradleVersion}",
-                'Agent-Class': 'me.lollopollqo.sus.injection.agent.Agent',
-                'Can-Redefine-Classes': 'true',
-                'Can-Retransform-Classes': 'true',
-                'Main-Class': 'me.lollopollqo.sus.injection.Main',
-                'Permissions': 'all-permissions'
-        )
+        attributes(manifestAttributes)
     }
 }
 
 tasks.register('fatJar', Jar) {
     manifest {
-        attributes(
-                'Manifest-Version': '1.0',
-                'Created-By': "Gradle ${gradle.gradleVersion}",
-                'Agent-Class': 'me.lollopollqo.sus.injection.agent.Agent',
-                'Can-Redefine-Classes': 'true',
-                'Can-Retransform-Classes': 'true',
-                'Main-Class': 'me.lollopollqo.sus.injection.Main',
-                'Permissions': 'all-permissions'
-        )
+        attributes(manifestAttributes)
     }
+
     archiveBaseName = rootProject.name
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
     from {
         configurations.runtimeClasspath.collect {
             it.isDirectory() ? it : zipTree(it)
